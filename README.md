@@ -14,13 +14,12 @@ With PG Collector an operator gains insights on various aspects of the database,
 * Unused Indexes & invalid indexes
 * Users & Roles Info
 * Toast Tables Mapping
-* Database Scehmas 
+* Database schemas 
 * Fragmentation (Bloat)
 * Tablespaces Info
 * Memory setting
 * Tables and Indexes Size and info
 * Transaction ID
-* Vacuum & Statistics
 * Replication slots
 * public Schema info 
 * Unlogged Tables
@@ -38,7 +37,7 @@ and more, please check the example reports
 
 [pg_collector v2.7](http://pg-collector.s3-website-us-west-2.amazonaws.com/pg_collector_postgres-2020-12-14_053537.html)
 
-All Sample reportes in [sample report folder](https://github.com/awslabs/pg-collector/tree/main/sample_reports).
+All Sample reports in [sample report folder](https://github.com/awslabs/pg-collector/tree/main/sample_reports).
 
 
 ## PG Collector output
@@ -62,7 +61,7 @@ PG Collector script will generate HTML file  under [/tmp](https://tldp.org/LDP/L
 
 1- you need [psql](https://www.postgresql.org/docs/10/app-psql.html) to be able to connect to the postgresql DB and run the pg_collector.sql script 
 
-2- Download pg_collector.sql in your labtop or the host that want to access the database from 
+2- Download pg_collector.sql in your laptop or the host that want to access the database from 
 
 3- login to the database using psql 
 ```

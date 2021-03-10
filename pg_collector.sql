@@ -4,13 +4,14 @@
 -- |  -- Create Date : 16 SEPT 2019                                                    |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations              |
 -- |                   and generate HTML Report                                        |
--- |  -- version : V 2.7                                                               |
+-- |  -- version : V 2.8                                                               |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/main/CHANGELOG.md    |                                                                |
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                |
 -- | SPDX-License-Identifier: MIT-0                                                    |
 -- +-----------------------------------------------------------------------------------+
 \H
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
+\echo Report name and location: /tmp/pg_collector_:filename.html
 \o /tmp/pg_collector_:filename.html
 \pset footer  off
 \qecho <style type='text/css'> 
@@ -61,7 +62,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" > PG COLLECTOR  V2.7 </h1>
+\qecho <h1 align="center" style="background-color:#e59003" > PG COLLECTOR  V2.8 </h1>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho 'PG Hostname / PG RDS ENDPOINT: ':HOST
@@ -121,11 +122,23 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho </tr>
 \qecho <tr>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#background_processes">Background processes</a></td>
-\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Multixact_ID_MXID">Multixact ID MXID</a></td> 
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Temp_tables">Temp tables</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Large_objects">Large objects</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Partition_tables">Partition tables</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_shdepend">pg_shdepend</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#FK_without_index ">FK without index</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#sequences">sequences</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_hba.conf">pg_hba.conf</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Duplicate_indexes">Duplicate indexes</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
-\qecho </table>  
+\qecho </table>
 \qecho <br>
 \qecho <br>
 \qecho <br>
@@ -147,13 +160,170 @@ SELECT pg_database.datname Database_Name , pg_size_pretty(pg_database_size(pg_da
 
 \qecho <a name="Transaction_ID_TXID"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Transaction ID TXID</b></font><hr align="left" width="460">
+\qecho <h3>oldest current xid:</h3>
+
 SELECT max(age(datfrozenxid)) oldest_current_xid FROM pg_database;
-\qecho <br>
-SELECT datname database_name ,age(datfrozenxid) oldest_current_xid_per_DB FROM pg_database;
-\qecho <br>
-WITH max_age AS ( SELECT 2000000000 as max_old_xid , setting AS autovacuum_freeze_max_age FROM pg_catalog.pg_settings WHERE name = 'autovacuum_freeze_max_age' ) , per_database_stats AS ( SELECT datname , m.max_old_xid::int , m.autovacuum_freeze_max_age::int , age(d.datfrozenxid) AS oldest_current_xid FROM pg_catalog.pg_database d JOIN max_age m ON (true) WHERE d.datallowconn ) SELECT max(oldest_current_xid) AS oldest_current_xid , max(ROUND(100*(oldest_current_xid/max_old_xid::float))) AS percent_towards_wraparound , max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_emergency_autovac FROM per_database_stats ;
---To find out which tables are aging
-\qecho <h3>which tables are aging : </h3>
+
+
+\qecho <h3>oldest current xid per database:</h3>
+
+SELECT datname database_name ,age(datfrozenxid) oldest_current_xid_per_DB 
+FROM pg_database order by 2 limit 20;
+
+
+\qecho <h3>percent_towards_emergency_autovac & percent_towards_wraparound :</h3>
+
+WITH max_age AS ( SELECT 2000000000 as max_old_xid , setting AS 
+autovacuum_freeze_max_age FROM pg_catalog.pg_settings 
+WHERE name = 'autovacuum_freeze_max_age' ) , 
+per_database_stats AS ( SELECT datname , m.max_old_xid::int , 
+m.autovacuum_freeze_max_age::int , age(d.datfrozenxid) AS oldest_current_xid 
+FROM pg_catalog.pg_database d JOIN max_age m ON (true) WHERE d.datallowconn ) 
+SELECT max(oldest_current_xid) AS oldest_current_xid , 
+max(ROUND(100*(oldest_current_xid/max_old_xid::float))) AS percent_towards_wraparound
+ , max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_emergency_autovac 
+ FROM per_database_stats ;
+
+
+\qecho <h3>current running autovacuum process:</h3>
+
+SELECT datname,usename,state,query,
+now() - pg_stat_activity.query_start AS duration, 
+wait_event from pg_stat_activity where query like 'autovacuum:%' order by 4;
+
+
+
+\qecho <h3>current running vacuum process:</h3>
+
+SELECT datname,usename,state,query,
+now() - pg_stat_activity.query_start AS duration,
+ wait_event from pg_stat_activity where query like 'vacuum:%' order by 4;
+
+
+\qecho <h3>vacuum progress process:</h3>
+
+SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'|| wait_event, 'f') AS waiting, 
+  CASE WHEN a.query ~ '^autovacuum.*to prevent wraparound' THEN 'wraparound' WHEN a.query ~ '^vacuum' THEN 'user' ELSE 'regular' END AS mode, 
+  p.datname AS database, p.relid::regclass AS table, p.phase, a.query ,
+  pg_size_pretty(p.heap_blks_total * current_setting('block_size')::int) AS table_size, 
+  pg_size_pretty(pg_total_relation_size(p.relid)) AS total_size, 
+  pg_size_pretty(p.heap_blks_scanned * current_setting('block_size')::int) AS scanned, 
+  pg_size_pretty(p.heap_blks_vacuumed * current_setting('block_size')::int) AS vacuumed, 
+  round(100.0 * p.heap_blks_scanned / p.heap_blks_total, 1) AS scanned_pct, 
+  round(100.0 * p.heap_blks_vacuumed / p.heap_blks_total, 1) AS vacuumed_pct, 
+  p.index_vacuum_count,
+  p.max_dead_tuples as max_dead_tuples_per_cycle,
+  s.n_dead_tup as total_num_dead_tuples ,
+  ceil(s.n_dead_tup::float/p.max_dead_tuples::float) index_cycles_required
+FROM pg_stat_progress_vacuum p JOIN pg_stat_activity a using (pid) 
+     join pg_stat_all_tables s on s.relid = p.relid
+ORDER BY now() - a.xact_start DESC;
+
+
+
+\qecho <h3>Inactive replication slots order by age_xmin:</h3>
+
+select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots where active = false order by age(xmin) desc;
+
+
+\qecho <h3>active replication slots order by age_xmin:</h3>
+
+select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots 
+where active = true 
+order by age(xmin) desc;
+
+
+\qecho <h3>Orphaned prepared transactions:</h3>
+
+SELECT gid, prepared, owner, database, age(transaction) AS ag_xmin 
+FROM pg_prepared_xacts
+ORDER BY age(transaction) DESC;
+
+\qecho <h3>MAX XID held:</h3>
+SELECT
+(SELECT max(age(backend_xmin)) FROM pg_stat_activity) as oldest_running_xact,
+(SELECT max(age(transaction)) FROM pg_prepared_xacts) as oldest_prepared_xact,
+(SELECT max(age(xmin)) FROM pg_replication_slots) as oldest_replication_slot,
+(SELECT max(age(backend_xmin))FROM pg_stat_replication)as oldest_replica_xact;
+
+
+--\qecho <h3>XID Rate:</h3>
+
+
+--SELECT max(age(datfrozenxid)) as xid1 FROM pg_database \gset 
+--select pg_sleep(60);
+--SELECT max(age(datfrozenxid)) as xid2 FROM pg_database \gset 
+--select txid_current() current_txid \gset
+     
+
+--select (select :xid2 - :xid1)as XID_Rate,(2000000000-:current_txid) as Remaining_XIDs,
+--(2000000000-:current_txid)/ ( select :xid2 - :xid1 ) /10/3600 hours_before_wraparound_prevention,
+--(2000000000-:current_txid)/ ( select :xid2 - :xid1 ) /10/3600/24 days_before_wraparound_prevention
+--;
+
+
+\qecho <h3>Autovacuum , vacuum and maintenance_work_mem Parameters:</h3>
+
+
+SELECT name,setting,source,sourcefile from pg_settings where name like '%vacuum%' order by 1;
+SELECT name,setting,source,sourcefile from pg_settings where name ='maintenance_work_mem';
+
+
+
+
+\qecho <h3>Which tables are currently eligible for autovacuum ? </h3>
+
+WITH vbt AS (SELECT setting AS autovacuum_vacuum_threshold FROM pg_settings WHERE name = 'autovacuum_vacuum_threshold')
+    , vsf AS (SELECT setting AS autovacuum_vacuum_scale_factor FROM pg_settings WHERE name = 'autovacuum_vacuum_scale_factor')
+    , fma AS (SELECT setting AS autovacuum_freeze_max_age FROM pg_settings WHERE name = 'autovacuum_freeze_max_age')
+    , sto AS (select opt_oid, split_part(setting, '=', 1) as param, split_part(setting, '=', 2) as value from (select oid opt_oid, unnest(reloptions) setting from pg_class) opt)
+SELECT
+    '"'||ns.nspname||'"."'||c.relname||'"' as relation
+    , pg_size_pretty(pg_table_size(c.oid)) as table_size
+    , age(relfrozenxid) as xid_age
+    , coalesce(cfma.value::float, autovacuum_freeze_max_age::float) autovacuum_freeze_max_age
+    , (coalesce(cvbt.value::float, autovacuum_vacuum_threshold::float) + coalesce(cvsf.value::float,autovacuum_vacuum_scale_factor::float) * c.reltuples) as autovacuum_vacuum_tuples
+    , n_dead_tup as dead_tuples
+FROM pg_class c join pg_namespace ns on ns.oid = c.relnamespace
+join pg_stat_all_tables stat on stat.relid = c.oid
+join vbt on (1=1) join vsf on (1=1) join fma on (1=1)
+left join sto cvbt on cvbt.param = 'autovacuum_vacuum_threshold' and c.oid = cvbt.opt_oid
+left join sto cvsf on cvsf.param = 'autovacuum_vacuum_scale_factor' and c.oid = cvsf.opt_oid
+left join sto cfma on cfma.param = 'autovacuum_freeze_max_age' and c.oid = cfma.opt_oid
+WHERE c.relkind = 'r' and nspname <> 'pg_catalog'
+and (
+    age(relfrozenxid) >= coalesce(cfma.value::float, autovacuum_freeze_max_age::float)
+    or
+    coalesce(cvbt.value::float, autovacuum_vacuum_threshold::float) + coalesce(cvsf.value::float,autovacuum_vacuum_scale_factor::float) * c.reltuples <= n_dead_tup
+   -- or 1 = 1
+)
+ORDER BY age(relfrozenxid) DESC ;
+
+
+\qecho <h3>autovacuum progress per day:</h3>
+
+select to_char(last_autovacuum, 'YYYY-MM-DD') as date, 
+count(*) from pg_stat_all_tables   
+group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
+
+
+ 
+\qecho <h3>when the last autovacuum succeeded ?</h3> 
+
+select relname as table_name,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, 
+last_vacuum, last_autovacuum, last_analyze, last_autoanalyze 
+from pg_stat_all_tables 
+order by last_autovacuum desc limit 20 ;
+
+
+
+
+\qecho <h3>Top-20 tables order by xid age:</h3>
+
+-- this need to be run in each DB in the instance 
+
 SELECT c.oid::regclass as relation_name,     
         greatest(age(c.relfrozenxid),age(t.relfrozenxid)) as age,
         pg_size_pretty(pg_table_size(c.oid)) as table_size,
@@ -162,6 +332,26 @@ FROM pg_class c
 LEFT JOIN pg_class t ON c.reltoastrelid = t.oid
 WHERE c.relkind in ('r', 't','m')
 order by 2 desc limit 20;
+
+
+
+\qecho <h3>indexs inforamtion for Top-20 tables order by xid age:</h3>
+
+SELECT schemaname,relname AS tablename,
+indexrelname AS indexname,
+idx_scan ,
+pg_relation_size(indexrelid) as index_size,
+pg_size_pretty(pg_relation_size(indexrelid)) AS pretty_index_size
+FROM pg_catalog.pg_stat_all_indexes
+WHERE  relname in (select relation_name::text from (SELECT c.oid::regclass as relation_name,     
+        greatest(age(c.relfrozenxid),age(t.relfrozenxid)) as age,
+        pg_size_pretty(pg_table_size(c.oid)) as table_size,
+        c.relkind
+FROM pg_class c
+LEFT JOIN pg_class t ON c.reltoastrelid = t.oid
+WHERE c.relkind in ('r', 't','m')
+order by 2 desc limit 20) as r1 )
+order by 2,4 ;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -395,6 +585,39 @@ select name as parameter_name, setting , unit , (((setting::BIGINT)*8)/1024)::BI
 from pg_settings where name in ('shared_buffers','wal_buffers','effective_cache_size')
 ) order by 4  desc;
 
+select name as parameter_name,setting  FROM pg_catalog.pg_settings WHERE name in ('huge_pages' ) ;
+\qecho <br>
+-- for the whole cluster 
+select 
+round((sum(blks_hit)::numeric / (sum(blks_hit) + sum(blks_read)::numeric))*100,2) as cache_read_hit_percentage
+from pg_stat_database ;
+\qecho <br>
+-- Per Database 
+select datname as database_name, 
+round((blks_hit::numeric / (blks_hit + blks_read)::numeric)*100,2) as cache_read_hit_percentage
+from pg_stat_database 
+where blks_hit + blks_read > 0
+and datname is not null 
+order by 2 desc;
+\qecho <br>
+-- per table
+SELECT schemaname,relname as table_name,
+ round((heap_blks_hit::numeric / (heap_blks_hit + heap_blks_read)::numeric)*100,2) as read_hit_percentage
+FROM 
+  pg_statio_all_tables
+  where heap_blks_hit + heap_blks_read > 0
+  and schemaname not in ('pg_catalog','information_schema')
+  order by 3;
+\qecho <br>
+-- per index 
+SELECT schemaname,relname as table_name,indexrelname as index_name ,
+ round((idx_blks_hit::numeric / (idx_blks_hit + idx_blks_read)::numeric)*100,2) as read_hit_percentage
+FROM 
+  pg_statio_all_indexes
+  where idx_blks_hit + idx_blks_read > 0
+  and schemaname not in ('pg_catalog','information_schema')
+  order by 4;
+
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -546,11 +769,8 @@ select * FROM pg_user;
 \qecho <a name="Tablespaces_Info"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Tablespaces Info</b></font><hr align="left" width="460">
 \qecho <br>
-\db
-\qecho <br>
-\qecho <h3> Tablsapces Location : </h3>
---tablsapces location 
-SELECT 
+SELECT spcname as Tablespace_Name,
+  pg_catalog.pg_get_userbyid(spcowner) as Owner,
 CASE
 WHEN 
 pg_tablespace_location(oid)=''
@@ -565,10 +785,10 @@ current_setting('data_directory')||'/global/'
 ELSE
 pg_tablespace_location(oid)
 END
-AS      spclocation,               
-spcname 
-FROM 
-pg_tablespace;
+AS      location          ,
+spcacl,spcoptions
+FROM pg_catalog.pg_tablespace
+ORDER BY 1;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -665,14 +885,15 @@ order by b.relation_size desc;
 \qecho <a name="Unused_Indexes"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Unused Indexes</b></font><hr align="left" width="460">
 \qecho <br>
-SELECT schemaname,relname AS tablename,
-indexrelname AS indexname,
-idx_scan ,
-pg_relation_size(indexrelid) as index_size,
-pg_size_pretty(pg_relation_size(indexrelid)) AS pretty_index_size
-FROM pg_catalog.pg_stat_all_indexes
-WHERE idx_scan = 0 
-and schemaname not in ('pg_catalog')
+SELECT ai.schemaname,ai.relname AS tablename,ai.indexrelid  as index_oid ,
+ai.indexrelname AS indexname,i.indisunique ,
+ai.idx_scan ,
+pg_relation_size(ai.indexrelid) as index_size,
+pg_size_pretty(pg_relation_size(ai.indexrelid)) AS pretty_index_size
+FROM pg_catalog.pg_stat_all_indexes ai , pg_index i
+WHERE ai.indexrelid=i.indexrelid
+and ai.idx_scan = 0 
+and ai.schemaname not in ('pg_catalog')
 order by index_size desc;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -1223,6 +1444,278 @@ order by ssl ;
 select count (*) as "Background processes count" FROM pg_stat_activity where datname is null ;
 \qecho <br>
 SELECT  pid , backend_type as  "Background processes Type" , backend_start as "start time" FROM pg_stat_activity where datname is null order by 3 ;
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Multixact ID MXID                                -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Multixact_ID_MXID"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Multixact ID MXID</b></font><hr align="left" width="460">
+\qecho <h3>oldest current mxid::</h3>
+SELECT max(mxid_age(datminmxid)) oldest_current_mxid FROM pg_database ;
+
+\qecho <h3>oldest current mxid per database:</h3>
+SELECT datname database_name , mxid_age(datminmxid) current_mxid FROM pg_database order by 2 desc;
+
+\qecho <h3>autovacuum_multixact_freeze_max_age parameter value:</h3>
+
+select setting AS autovacuum_multixact_freeze_max_age FROM pg_catalog.pg_settings WHERE name = 'autovacuum_multixact_freeze_max_age';
+
+\qecho <h3>Top-20 tables order by MXID age:</h3>
+
+
+select relname as table_name ,mxid_age(relminmxid) mmxid_age from pg_class where relname not like 'pg_toast%'
+and relminmxid::text::int>0
+order by 2 desc limit 20;
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Temp tables                                      -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Temp_tables"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Temp tables</b></font><hr align="left" width="460">
+
+
+\qecho <h3>Parameters:</h3>
+
+select 
+name as parameter_name,setting  
+FROM pg_catalog.pg_settings 
+WHERE name in ('temp_buffers','temp_tablespaces','temp_file_limit','log_temp_files' ) ;
+\qecho <br>
+\qecho <h3>Temp tables statistics:</h3>
+\qecho <h4>Note: Number of temporary files created by queries in every Database and total amount of data written to temporary files by queries in every Database </h4>
+\qecho <br>
+select datname as database_name, temp_bytes/1024/1024 temp_size_MB,
+temp_bytes/1024/1024/1024 temp_size_GB ,temp_files  from  pg_stat_database
+where  temp_bytes + temp_files > 0
+and datname is not null  
+order by 2  desc;
+
+\qecho <br>
+SELECT
+n.nspname as SchemaName
+,c.relname as RelationName
+,CASE c.relkind
+WHEN 'r' THEN 'table'
+WHEN 'v' THEN 'view'
+WHEN 'i' THEN 'index'
+WHEN 'S' THEN 'sequence'
+WHEN 's' THEN 'special'
+END as RelationType
+,pg_catalog.pg_get_userbyid(c.relowner) as RelationOwner
+,pg_size_pretty(pg_relation_size(n.nspname ||'.'|| c.relname)) as RelationSize
+FROM pg_catalog.pg_class c
+LEFT JOIN pg_catalog.pg_namespace n
+ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r','s')
+AND (n.nspname !~ '^pg_toast' and nspname like 'pg_temp%')
+ORDER BY pg_relation_size(n.nspname ||'.'|| c.relname) DESC ;
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Large_objects                                    -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Large_objects"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Large objects</b></font><hr align="left" width="460">
+
+\qecho <br>
+\qecho <h4>Note:The catalog pg_largeobject_metadata holds metadata associated with large objects. The actual large object data is stored in pg_largeobject</h4>
+\qecho <br>
+\qecho <h3>Number of Large objects in pg_largeobject_metadata table: </h3>
+select count(*)  from pg_largeobject_metadata ;
+
+\qecho <br>
+\qecho <h3>which user own the lo ? </h3>
+select pg_get_userbyid(lomowner) as user_name ,count (*) as number_of_lo from pg_largeobject_metadata 
+group by 1  order by 2 desc;
+
+
+\qecho <br>
+\qecho <h3>pg_largeobject_metadata table size: </h3>
+\dt+ pg_largeobject_metadata;
+
+\qecho <br>
+--select count(*)  from pg_largeobject;
+-- in RDS PG : ERROR:  permission denied for table pg_largeobject
+
+\qecho <br>
+\qecho <h3>pg_largeobject table size: </h3>
+\qecho <h4>Each large object is broken into segments or “pages” small enough to be conveniently stored as rows in pg_largeobject. </h4>
+\qecho <h4>The amount of data per page is defined to be LOBLKSIZE (which is currently BLCKSZ/4, or typically 2 kB)</h4>
+\qecho <br>
+\dt+ pg_largeobject;
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Partition_tables                                    -               |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Partition_tables"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Partition tables</b></font><hr align="left" width="460">
+
+
+SELECT
+    parent.oid                        AS parent_table_oid,
+    parent.relname                    AS parent_table_name,
+    count(child.oid)                  AS partition_count
+FROM pg_inherits
+    JOIN pg_class parent            ON pg_inherits.inhparent = parent.oid
+    JOIN pg_class child             ON pg_inherits.inhrelid   = child.oid 
+    group by 1,2
+    order by 3 desc;
+
+
+\qecho <br>
+
+SELECT
+    parent.relnamespace::regnamespace AS parent_table_schema,
+    parent.relowner::regrole          AS parent_table_owner,
+    parent.oid                        AS parent_table_oid,
+    parent.relname                    AS parent_table_name,
+  --child.relnamespace::regnamespace  AS partition_schema,
+    child.oid                         AS partition_oid,
+    child.relname                     AS partition_name
+FROM pg_inherits
+    JOIN pg_class parent            ON pg_inherits.inhparent = parent.oid
+    JOIN pg_class child             ON pg_inherits.inhrelid   = child.oid 
+    order by 3 ,6;
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - pg_shdepend                                    -                    |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="pg_shdepend"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>pg_shdepend</b></font><hr align="left" width="460">
+
+\qecho <h4>The catalog pg_shdepend records the dependency relationships between database objects and shared objects</h4>
+
+select d.datname as database_name, c.relname as table_name, count(*)
+from pg_catalog.pg_shdepend ps, pg_class c, pg_database d
+where c.oid = ps.classid
+and ps.dbid = d.oid
+group by d.datname,c.relname
+order by 1,3 desc;
+
+-- +----------------------------------------------------------------------------+
+-- |      - FK_without_index                                 -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="FK_without_index"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>FK without index</b></font><hr align="left" width="460">
+
+
+
+SELECT c.conrelid::regclass AS "table",
+       /* list of key column names in order */
+       string_agg(a.attname, ',' ORDER BY x.n) AS columns,
+       pg_catalog.pg_size_pretty(
+          pg_catalog.pg_relation_size(c.conrelid)
+       ) AS size,
+       c.conname AS constraint,
+       c.confrelid::regclass AS referenced_table
+FROM pg_catalog.pg_constraint c
+   /* enumerated key column numbers per foreign key */
+   CROSS JOIN LATERAL
+      unnest(c.conkey) WITH ORDINALITY AS x(attnum, n)
+   /* name for each key column */
+   JOIN pg_catalog.pg_attribute a
+      ON a.attnum = x.attnum
+         AND a.attrelid = c.conrelid
+WHERE NOT EXISTS
+        /* is there a matching index for the constraint? */
+        (SELECT 1 FROM pg_catalog.pg_index i
+         WHERE i.indrelid = c.conrelid
+           /* the first index columns must be the same as the
+              key columns, but order doesn't matter */
+           AND (i.indkey::smallint[])[0:cardinality(c.conkey)-1]
+               OPERATOR(pg_catalog.@>) c.conkey)
+  AND c.contype = 'f'
+GROUP BY c.conrelid, c.conname, c.confrelid
+ORDER BY pg_catalog.pg_relation_size(c.conrelid) DESC;
+
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - sequences                                    -                      |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="sequences"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>sequences</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3>sequence wraparound:</h3>
+\qecho <h3>Sequences with less than 10% of the remain values</h3>
+--sequence wraparound
+select * from 
+(
+select * ,(sec.max_value - coalesce(sec.last_value,0)) as remain_values ,round((((sec.max_value - coalesce(sec.last_value,0)::float)/sec.max_value::float) *100)::int,2) remain_values_pct from pg_sequences sec ) t
+where remain_values_pct <= 10 
+and cycle is false 
+order by remain_values_pct;
+\qecho <br>
+\qecho <h3>All sequences:</h3>
+select * ,(sec.max_value - coalesce(sec.last_value,0)) as remain_values ,round((((sec.max_value - coalesce(sec.last_value,0)::float)/sec.max_value::float) *100)::int,2) remain_values_pct from pg_sequences sec order by remain_values_pct;
+
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - pg_hba.conf                                   -                     |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="pg_hba.conf"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>pg_hba.conf</b></font><hr align="left" width="460">
+
+\qecho <br>
+\qecho <h4>Note: this view pg_hba_file_rules reports on the current contents of the file, not on what was last loaded by the server </h4>
+select * from pg_hba_file_rules;
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Duplicate_indexes                                   -               |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Duplicate_indexes"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Duplicate indexes</b></font><hr align="left" width="460">
+SELECT pg_size_pretty(sum(pg_relation_size(idx))::bigint) as size,
+       (array_agg(idx))[1] as idx1, (array_agg(idx))[2] as idx2,
+       (array_agg(idx))[3] as idx3, (array_agg(idx))[4] as idx4
+FROM (
+    SELECT indexrelid::regclass as idx, (indrelid::text ||E'\n'|| indclass::text ||E'\n'|| indkey::text ||E'\n'||
+                                         coalesce(indexprs::text,'')||E'\n' || coalesce(indpred::text,'')) as key
+    FROM pg_index) sub
+GROUP BY key HAVING count(*)>1
+ORDER BY sum(pg_relation_size(idx)) DESC;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 

@@ -41,4 +41,20 @@ Add new section for Default access privileges
 #  v2.6 
 Add new section for pgaudit_extension,unlogged_tables and access_privileges 
 #  v2.7 
-Add new section for ssl and Background processes    
+Add new section for ssl and Background processes
+#  v2.8
+ 1- Add new section for Large objects
+ 2- Add new section for Partition tables 
+ 3- Update XID section by adding more queries to help in Transaction ID Wraparound investigation  
+ 4- Add new section for MXID (Multixact IDs) 
+ 5- Add cache hit ratio To the Memory setting section 
+ 6- Add new section for Temp tables 
+ 7- Add new section for FK without index
+ 8- Add new section for pg_shdepend 
+ 9- Add new section for sequences and sequence wraparound
+ 10- Add huge_pages parameter value to the Memory setting section 
+ 11- Add i.indisunique (If true, this is a unique index) to the unused indexes section 
+ 12- Add new section for pg_hba.conf (view pg_hba_file_rules)
+ 13- Add new section for Duplicate indexes
+ 14- update Tablespaces_Info section
+ 15- Print the Report name and location in the terminal      
