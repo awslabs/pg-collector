@@ -17,7 +17,7 @@ and pg_stat_statements_extension .
 #  v1.6 
 Add the following sections Users , Roles , schema and Tablespaces Info .    
 #  v1.7 
-Add the following sections Tabel Access Profile, Index Access Profile,      
+Add the following sections table Access Profile, Index Access Profile,      
 Fragmentation (Bloat), DB UP TIME and Unused_Indexes Info .                   
 #  v1.8 
 Add the following sections Toast Tables Mapping and                         
@@ -43,6 +43,7 @@ Add new section for pgaudit_extension,unlogged_tables and access_privileges
 #  v2.7 
 Add new section for ssl and Background processes
 #  v2.8
+```
  1- Add new section for Large objects
  2- Add new section for Partition tables 
  3- Update XID section by adding more queries to help in Transaction ID Wraparound investigation  
@@ -57,4 +58,37 @@ Add new section for ssl and Background processes
  12- Add new section for pg_hba.conf (view pg_hba_file_rules)
  13- Add new section for Duplicate indexes
  14- update Tablespaces_Info section
- 15- Print the Report name and location in the terminal      
+ 15- Print the Report name and location in the terminal
+```
+#  v2.9
+```
+1- Add HTML <details> Tag to each section so the user can open and close it on demand, it is closed by By default , this will help make the report more readable and Easy to navigate when the DB have a lot of objects.
+2- Add new section for Functions statistics .
+3- Change active session monitor section name to session/connection info and add more information .
+4- Fix link issue (FK_without_index) .
+5- Add log_temp_files to Temp tables section .
+6- Add temp_buffers to Memory setting section .
+7- Enhance the following sections  (tables without auto vacuum  , tables without auto analyze  , tables without auto analyze, auto vacuum, vacuum and analyze) .
+8- Change Replication_slot section name to Replication and add Replication slot lag and Replication Parameters .
+9- PG collector will be able to detect and report the PG server type and the database Role .
+Note: Thanks to Jeremy Schneider as he the author of this part of the code .
+PG server type :
+RDS PG = RDS- < PG_Version >  
+Aurora PG =  Aurora- < PG_Version > - < Aurora_Version >
+PostgreSQL Community = PG- < PG_Version > 
+
+Database Role :
+Primary/writer DB (Read write)
+Standby/Reader DB (Read Only)
+10- Add new section for DB Load (wait events stats,Locks ,pg_stat_* views)
+11- Add new section for Triggers .
+12- Add new section for pg_config .
+13- https://github.com/awslabs/pg-collector/issues/1 requested by thottr@
+
+    13-1. Add queryid to the pg_stat_statements's queries ( pg_stat_statements extension section)
+    13-2. Add Top SQL order by shared blocks read (physical reads)  ( pg_stat_statements extension section)
+    13-3. Add Top 50 Tables by total physical reads and total physical reads percent to Table Access Profile section
+    13-4. Add Top 50 indexes by physical reads and physical reads percent to Index Access Profile section
+     
+
+```

@@ -33,7 +33,7 @@ and more, please check the example reports
 
 ## Example of PG Collector report 
 
-[pg_collector v2.6](http://pg-collector.s3-website-us-west-2.amazonaws.com/pg_collector_testdb-2020-10-16_021546.html)
+[pg_collector v2.9](http://pg-collector.s3-website-us-west-2.amazonaws.com/pg_collector_postgres-2021-08-02_181348.html)
 
 [pg_collector v2.7](http://pg-collector.s3-website-us-west-2.amazonaws.com/pg_collector_postgres-2020-12-14_053537.html)
 
@@ -71,6 +71,12 @@ psql -h [hostname or RDS endpoint] -p [Port] -d [Database name ] -U [user name]
 
 ```
 \i pg_collector.sql 
+\q
+```
+or use -f option in psql 
+
+```
+psql -h [hostname or RDS endpoint] -p [Port] -d [Database name ] -U [user name] -f pg_collector.sql 
 ```
 
 Example :
@@ -115,6 +121,22 @@ psql:pg_collector.sql:523: ERROR:  relation "pg_stat_statements" does not exist
 LINE 10: from pg_stat_statements
               ^
 postgres=> \q
+```
+
+2- if the Database have Tens of thousands of tables , some queries can take longer time .
+use statement_timeout to Abort any statement that takes more than the specified number of milliseconds.
+please check below example .  
+
+
+```
+postgres=> set statement_timeout=30000;
+SET
+postgres=> \i pg_collector.sql
+Output format is html.
+Report name and location: /tmp/pg_collector_postgres-2021-07-22_194944.html
+psql:pg_collector.sql:1442: ERROR:  canceling statement due to statement timeout
+postgres=>
+
 ```
 
 
