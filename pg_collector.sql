@@ -1,14 +1,14 @@
--- +-----------------------------------------------------------------------------------+
--- |  -- Script Name: pg_collector.sql                                                 |
--- |  -- Author : Mohamed Ali                                                          |
--- |  -- Create Date : 16 SEPT 2019                                                    |
--- |  -- Description : Script to Collect PostgreSQL Database Informations              |
--- |                   and generate HTML Report                                        |
--- |  -- version : V1 for PostgreSQL 13                                                                |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/main/CHANGELOG.md    |                                                                |
--- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                |
--- | SPDX-License-Identifier: MIT-0                                                    |
--- +-----------------------------------------------------------------------------------+
+-- +-------------------------------------------------------------------------------------------------------------+
+-- |  -- Script Name: pg_collector.sql                                                                           |
+-- |  -- Author : Mohamed Ali                                                                                    |
+-- |  -- Create Date : 16 SEPT 2019                                                                              |
+-- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
+-- |                   and generate HTML Report                                                                  |
+-- |  -- version : V1 for PostgreSQL 14                                                                          |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresQL-14/CHANGELOG.md    | 
+-- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
+-- | SPDX-License-Identifier: MIT-0                                                                              |
+-- +-------------------------------------------------------------------------------------------------------------+
 \H
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
 \echo Report name and location: /tmp/pg_collector_:filename.html
@@ -62,7 +62,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 13</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 14</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
