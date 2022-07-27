@@ -4,8 +4,8 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1 for PostgreSQL 14                                                                          |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresQL-14/CHANGELOG.md    | 
+-- |  -- version : V1.1 for PostgreSQL 14                                                                        |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-14/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -62,8 +62,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 14</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 14</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-14" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -169,7 +169,7 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <tr>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#triggers">Triggers</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_config">pg_config</a></td>
-\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#COPY_command_progress">COPY command progress</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
 \qecho </table>
@@ -348,7 +348,7 @@ group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
  
 \qecho <h3>when the last autovacuum succeeded ?</h3> 
 
-select relname as table_name,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, 
+select relname as table_name,n_live_tup, n_tup_upd, n_tup_del,n_tup_ins, n_dead_tup, 
 last_vacuum, last_autovacuum, last_analyze, last_autoanalyze 
 from pg_stat_all_tables 
 order by last_autovacuum desc limit 20 ;
@@ -493,7 +493,7 @@ FROM pg_catalog.pg_statio_all_indexes  ORDER BY 4 desc limit 50;
 \qecho <details>
 SELECT * from pg_settings where category like 'Autovacuum';
 \qecho <br>
-SELECT *  FROM pg_settings where name in ('rds.force_autovacuum_logging_level','log_autovacuum_min_duration') order by category;
+SELECT *  FROM pg_settings where name in ('rds.force_autovacuum_logging_level','log_autovacuum_min_duration','vacuum_failsafe_age','vacuum_multixact_failsafe_age') order by category;
 \qecho <br>
 \qecho </details>
 -- currnt running  vacuum porecess
@@ -524,7 +524,7 @@ select to_char(last_autoanalyze, 'YYYY-MM-DD') , count(*) from pg_stat_all_table
 \qecho </details>
 \qecho <br>
 --Which tables are currently eligible for autovacuum based on curret parameters
-\qecho <h3>Which tables are currently eligible for autovacuum based on curret parameters : </h3>
+\qecho <h3>Which tables are currently eligible for autovacuum based on current parameters : </h3>
 \qecho <br>
 \qecho <details>
 WITH vbt AS (SELECT setting AS autovacuum_vacuum_threshold FROM pg_settings WHERE name = 'autovacuum_vacuum_threshold')
@@ -577,7 +577,7 @@ select schemaname,relname , last_vacuum,last_autovacuum,n_live_tup,n_dead_tup , 
 \qecho <h3>pg_stat_all_tables : </h3>
 \qecho <br>
 \qecho <details>
-select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count from pg_stat_all_tables  where schemaname not in ('pg_catalog','pg_toast') order by 2;
+select * from pg_stat_all_tables order by schemaname;
 \qecho </details>
 \qecho <br>
 \qecho <h3>pg_stat_all_tables order by autovacuum_count : </h3>
@@ -597,7 +597,7 @@ select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanal
 \qecho <details>
 select count(*) from pg_stat_all_tables  where  autoanalyze_count = 0 ;
 \qecho <br>
-select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_mod_since_analyze from pg_stat_all_tables  where  autoanalyze_count = 0  order by 2;
+select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_mod_since_analyze,n_ins_since_vacuum from pg_stat_all_tables  where  autoanalyze_count = 0  order by 2;
 \qecho </details>
 \qecho <br>
 \qecho <h3>tables without auto vacuum : </h3>
@@ -605,7 +605,7 @@ select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanaly
 \qecho <details>
 select count(*) from pg_stat_all_tables  where autovacuum_count  = 0 ;
 \qecho <br>
-select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_dead_tup from pg_stat_all_tables  where autovacuum_count  = 0  order by 2;
+select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_dead_tup,n_tup_ins ,n_ins_since_vacuum from pg_stat_all_tables  where autovacuum_count  = 0  order by 2;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Tables that have not been manually analyzed :</h3>
@@ -797,7 +797,14 @@ group by name
 where r.extension_name='pg_stat_statements';
 ;
 \qecho </details>
-
+\qecho <br>        
+\qecho <h3> pg_stat_statements_info view: </h3>       
+\qecho <br>
+\qecho <details>
+\qecho <h4> The statistics of the pg_stat_statements module itself are tracked and made available via a view named pg_stat_statements_info </h4>
+\qecho <h4> dealloc column show the Total number of times pg_stat_statements entries about the least-executed statements were deallocated because more distinct statements than pg_stat_statements.max were observed </h4> 
+select * from pg_stat_statements_info ;
+\qecho </details>
 \qecho <br>
 \qecho <h3> Top SQL order by total_exec_time: </h3>
 \qecho <br>
@@ -1477,13 +1484,36 @@ from pg_replication_slots where active = false order by age(xmin) desc;
 \qecho <h4>  select 'select pg_drop_replication_slot('''||slot_name||''');' from pg_replication_slots where active = false; </h4>
 \qecho <h4> then Verify the CLoudWatch metrics Free Storage Space to confirm that disk space was released </h4>
 \qecho <br>
+\qecho <h3> Replication Slot wal status :</h3> 
+select 
+name as parameter_name,setting,unit,short_desc  
+FROM pg_catalog.pg_settings 
+WHERE name in ('max_slot_wal_keep_size' ) ;
+\qecho <br>
+select slot_name,slot_type,database,active,wal_status ,safe_wal_size ,
+coalesce(round(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) / 1024 / 1024 , 2),0) AS Lag_MB_behind ,
+coalesce(round(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) / 1024 / 1024 / 1024, 2),0) AS Lag_GB_behind
+from pg_replication_slots 
+order by safe_wal_size ;
+\qecho <h4> wal_status : the Availability of WAL files claimed by this slot. Possible values are: </h4>
+\qecho <h4> - reserved means that the claimed files are within max_wal_size. </h4>
+\qecho <h4> - extended means that max_wal_size is exceeded but the files are still retained, either by the replication slot or by wal_keep_size. </h4>
+\qecho <h4> - unreserved means that the slot no longer retains the required WAL files and some of them are to be removed at the next checkpoint. This state can return to reserved or extended. </h4>
+\qecho <h4> - lost means that some required WAL files have been removed and this slot is no longer usable. </h4>
+\qecho <h4> The last two states are seen only when max_slot_wal_keep_size is non-negative. If restart_lsn is NULL, this field is null. </h4>
+\qecho <h4> safe_wal_size : The number of bytes that can be written to WAL such that this slot is not in danger of getting in state "lost". It is NULL for lost slots, as well as if max_slot_wal_keep_size is -1. </h4>
+\qecho <br>
+\qecho <h3> pg_stat_replication_slots view:</h3> 
+\qecho <h4> pg_stat_replication_slots is a statistics view showing statistics about logical replication slot usage, specifically about transactions spilled to disk from the ReorderBuffer once the memory used by logical decoding to decode changes from WAL has exceeded logical_decoding_work_mem </h4>
+SELECT * FROM pg_stat_replication_slots order by spill_bytes;
+
 \qecho <h3>Replication Parameters :</h3> 
 select 
 name as parameter_name,setting,unit,short_desc  
 FROM pg_catalog.pg_settings 
 WHERE name in ('wal_level','max_wal_senders','max_replication_slots',
 'max_worker_processes','max_logical_replication_workers','wal_receiver_timeout',
-'max_sync_workers_per_subscription','wal_receiver_status_interval','wal_retrieve_retry_interval' ) ;
+'max_sync_workers_per_subscription','wal_receiver_status_interval','wal_retrieve_retry_interval','logical_decoding_work_mem','max_slot_wal_keep_size' ) ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -1502,6 +1532,19 @@ with
 settings as (SELECT setting::float AS "max_connections" FROM pg_settings WHERE name = 'max_connections'),
 connections as (select sum (numbackends)::float total_connections from pg_stat_database)
 select   settings.max_connections AS "Max_connections" ,total_connections as "Total_connections",ROUND((100*(connections.Total_connections/settings.max_connections))::numeric,2) as "Connections utilization %" from  settings, connections;
+\qecho <h3>Sessions statistics:</h3>
+select 
+datname as Database_name
+,session_time
+,active_time
+,idle_in_transaction_time
+,sessions
+,sessions_abandoned
+,sessions_fatal
+,sessions_killed
+from pg_stat_database 
+where datname is not null 
+order by active_time desc ;
 \qecho <h3> DB/Connections count :</h3>
 SELECT datname as "Database_Name",count(*) as "Connections_count" FROM pg_stat_activity where datname is not null group by datname order by 2 desc;
 \qecho <h3> DB/username/Connections count :</h3>
@@ -1514,6 +1557,8 @@ SELECT usename as "User_Name",state as status,count(*) as "Connections_count" FR
 SELECT state as status ,count(*) as "Connections_count" FROM pg_stat_activity where datname is not null GROUP BY status order by 2 desc;
 \qecho <h3> username/status/SQL/count : </h3>
 SELECT usename as "User_Name" , state as status , query, count(*) FROM pg_stat_activity where datname is not null group by usename,state,query ;
+\qecho <h3> username/status/query_id/count : </h3>
+SELECT usename as "User_Name" , state as status , query_id, count(*) FROM pg_stat_activity where datname is not null group by usename,state,query_id ;
 \qecho </details>
 
 \qecho <br>
@@ -1524,7 +1569,7 @@ SELECT usename as "User_Name" , state as status , query, count(*) FROM pg_stat_a
 (
     SELECT
 usename,pid, now() - pg_stat_activity.xact_start AS xact_duration ,now() - pg_stat_activity.query_start AS query_duration,
-substr(query,1,50) as query,state,wait_event
+substr(query,1,50) as query,query_id,state,wait_event
 FROM pg_stat_activity
 ) as s where (xact_duration is not null  or query_duration is not null ) and state!='idle' and query not like '%active_session_monitor%'
 order by xact_duration desc, query_duration desc;
@@ -2215,6 +2260,9 @@ SELECT coalesce(wait_event,'CPU') as wait_event , count(*) FROM pg_stat_activity
 \qecho <h3>wait events/query  :</h3>
 SELECT  coalesce(wait_event,'CPU') as wait_event, substr(query,1,150) as query,count(*) FROM pg_stat_activity   group by  query,wait_event order by 3 desc;
 \qecho <br>
+\qecho <h3>wait events/query_id  :</h3>
+SELECT  coalesce(wait_event,'CPU') as wait_event, query_id ,count(*) FROM pg_stat_activity   group by  query_id,wait_event order by 3 desc;
+\qecho <br>
 \qecho <h3>wait events/user name :</h3>
 SELECT coalesce(wait_event,'CPU') wait_event,usename as user_name, count(*) FROM pg_stat_activity group by wait_event, usename order by 3 desc ;
 \qecho </details>
@@ -2250,6 +2298,8 @@ select * from pg_stat_database;
 \qecho <br>
 \qecho <h3>pg_stat_database_conflicts view:</h3>
 select * from pg_stat_database_conflicts;
+\qecho <h3>pg_stat_wal view:</h3>
+SELECT * FROM pg_stat_wal;
 \qecho </details>
 
 
@@ -2369,6 +2419,22 @@ SELECT *  FROM pg_settings where name in ('rds.extensions') order by category;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
 -- +----------------------------------------------------------------------------+
+-- |      - COPY_command_progress                                    -          |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="COPY_command_progress"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>COPY command progress</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+SELECT * FROM pg_stat_progress_copy ;
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+-- +----------------------------------------------------------------------------+
 -- |      - *************                                    -                  |
 -- +----------------------------------------------------------------------------+
 
@@ -2381,6 +2447,7 @@ SELECT *  FROM pg_settings where name in ('rds.extensions') order by category;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
 
 
 \q
