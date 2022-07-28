@@ -1,14 +1,14 @@
--- +-----------------------------------------------------------------------------------+
--- |  -- Script Name: pg_collector.sql                                                 |
--- |  -- Author : Mohamed Ali                                                          |
--- |  -- Create Date : 16 SEPT 2019                                                    |
--- |  -- Description : Script to Collect PostgreSQL Database Informations              |
--- |                   and generate HTML Report                                        |
--- |  -- version : V1 for PostgreSQL 13                                                                |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/main/CHANGELOG.md    |                                                                |
--- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                |
--- | SPDX-License-Identifier: MIT-0                                                    |
--- +-----------------------------------------------------------------------------------+
+-- +-------------------------------------------------------------------------------------------------------------+
+-- |  -- Script Name: pg_collector.sql                                                                           |
+-- |  -- Author : Mohamed Ali                                                                                    |
+-- |  -- Create Date : 16 SEPT 2019                                                                              |
+-- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
+-- |                   and generate HTML Report                                                                  |
+-- |  -- version : V1.1 for PostgreSQL 13                                                                        |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-13/CHANGELOG.md    |    
+-- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
+-- | SPDX-License-Identifier: MIT-0                                                                              |
+-- +-------------------------------------------------------------------------------------------------------------+
 \H
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
 \echo Report name and location: /tmp/pg_collector_:filename.html
@@ -62,8 +62,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 13</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 13</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-13" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -577,7 +577,7 @@ select schemaname,relname , last_vacuum,last_autovacuum,n_live_tup,n_dead_tup , 
 \qecho <h3>pg_stat_all_tables : </h3>
 \qecho <br>
 \qecho <details>
-select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count from pg_stat_all_tables  where schemaname not in ('pg_catalog','pg_toast') order by 2;
+select * from pg_stat_all_tables order by schemaname;
 \qecho </details>
 \qecho <br>
 \qecho <h3>pg_stat_all_tables order by autovacuum_count : </h3>
@@ -597,7 +597,7 @@ select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanal
 \qecho <details>
 select count(*) from pg_stat_all_tables  where  autoanalyze_count = 0 ;
 \qecho <br>
-select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_mod_since_analyze from pg_stat_all_tables  where  autoanalyze_count = 0  order by 2;
+select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_mod_since_analyze,n_ins_since_vacuum from pg_stat_all_tables  where  autoanalyze_count = 0  order by 2;
 \qecho </details>
 \qecho <br>
 \qecho <h3>tables without auto vacuum : </h3>
@@ -605,7 +605,7 @@ select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanaly
 \qecho <details>
 select count(*) from pg_stat_all_tables  where autovacuum_count  = 0 ;
 \qecho <br>
-select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_dead_tup from pg_stat_all_tables  where autovacuum_count  = 0  order by 2;
+select relname,schemaname,last_vacuum,last_autovacuum,autovacuum_count,autoanalyze_count,last_analyze,last_autoanalyze,n_dead_tup,n_tup_ins ,n_ins_since_vacuum from pg_stat_all_tables  where autovacuum_count  = 0  order by 2;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Tables that have not been manually analyzed :</h3>
@@ -1477,13 +1477,32 @@ from pg_replication_slots where active = false order by age(xmin) desc;
 \qecho <h4>  select 'select pg_drop_replication_slot('''||slot_name||''');' from pg_replication_slots where active = false; </h4>
 \qecho <h4> then Verify the CLoudWatch metrics Free Storage Space to confirm that disk space was released </h4>
 \qecho <br>
+\qecho <h3> Replication Slot wal status :</h3> 
+select 
+name as parameter_name,setting,unit,short_desc  
+FROM pg_catalog.pg_settings 
+WHERE name in ('max_slot_wal_keep_size' ) ;
+\qecho <br>
+select slot_name,slot_type,database,active,wal_status ,safe_wal_size ,
+coalesce(round(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) / 1024 / 1024 , 2),0) AS Lag_MB_behind ,
+coalesce(round(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) / 1024 / 1024 / 1024, 2),0) AS Lag_GB_behind
+from pg_replication_slots 
+order by safe_wal_size ;
+\qecho <h4> wal_status : the Availability of WAL files claimed by this slot. Possible values are: </h4>
+\qecho <h4> - reserved means that the claimed files are within max_wal_size. </h4>
+\qecho <h4> - extended means that max_wal_size is exceeded but the files are still retained, either by the replication slot or by wal_keep_size. </h4>
+\qecho <h4> - unreserved means that the slot no longer retains the required WAL files and some of them are to be removed at the next checkpoint. This state can return to reserved or extended. </h4>
+\qecho <h4> - lost means that some required WAL files have been removed and this slot is no longer usable. </h4>
+\qecho <h4> The last two states are seen only when max_slot_wal_keep_size is non-negative. If restart_lsn is NULL, this field is null. </h4>
+\qecho <h4> safe_wal_size : The number of bytes that can be written to WAL such that this slot is not in danger of getting in state "lost". It is NULL for lost slots, as well as if max_slot_wal_keep_size is -1. </h4>
+\qecho <br>
 \qecho <h3>Replication Parameters :</h3> 
 select 
 name as parameter_name,setting,unit,short_desc  
 FROM pg_catalog.pg_settings 
 WHERE name in ('wal_level','max_wal_senders','max_replication_slots',
 'max_worker_processes','max_logical_replication_workers','wal_receiver_timeout',
-'max_sync_workers_per_subscription','wal_receiver_status_interval','wal_retrieve_retry_interval' ) ;
+'max_sync_workers_per_subscription','wal_receiver_status_interval','wal_retrieve_retry_interval','logical_decoding_work_mem' ) ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
