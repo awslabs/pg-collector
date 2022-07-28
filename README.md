@@ -26,6 +26,31 @@ With PG Collector an operator gains insights on various aspects of the database,
 
 and more, please check the example reports 
 
+## Versioning Policy :
+
+Starting from PostgreSQL 13, PG Collector will have a dedicated script for each PostgreSQL major version .
+
+each PG Collector major version will have it is own branch and the main branch will be for PG Collector that support PostgreSQL 12 and older versions 
+
+<img src="img/PG_Collector_branches.png" alt="">
+
+## How to download PG Collector that match your PostgreSQL major version ?
+
+From [pg-collector releases](https://github.com/awslabs/pg-collector/releases)
+
+select PG Collector version that match your PostgreSQL major version 
+
+<img src="img/pg_collector_releases_1.png" alt="">
+<img src="img/pg_collector_releases_2.png" alt="">
+
+## How to check PG Collector version ?
+
+- from the PG Collector report header  
+<img src="img/PG_Collector_report_header_version.png" alt="">
+
+- from the PG Collector script header
+<img src="img/PG_Collector_script_header.png" alt=""> 
+
 ## PG Collector report header 
 <img src="img/pg_collector_header_V2.6.png" alt="">
 
