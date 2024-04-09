@@ -22,3 +22,13 @@ following pg_stat_statements columns renamed:
 1- Add logical_decoding_work_mem parameter to Replication Parameters
 2- Add Replication Slot wal status to Replication section    
 ```
+#  V1.2 
+```
+1- Enhance the where condition in the following sections “current running vacuum process“and ”current running autovacuum process“.
+2- Fix typos, Thanks to Vikas Gupta for highlighting them .
+3- Upade percent_towards_wraparound's query with 2^31-1000000 .
+4- Add reserved connections parameters info to the Connections Info section .
+5- Add DB/username/status/Connections count to the Connections Info section .
+6- Add objects list and count in each schema to the schema info section .
+7- Update the Toast Tables Mapping's sql to order the toast by the size and add note about toast OID wraparound
+```

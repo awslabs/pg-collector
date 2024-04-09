@@ -4,7 +4,7 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1.1 for PostgreSQL 13                                                                        |
+-- |  -- version : V1.2 for PostgreSQL 13                                                                        |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-13/CHANGELOG.md    |    
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
@@ -62,7 +62,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 13</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.2 for PostgreSQL 13</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-13" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
@@ -209,15 +209,15 @@ FROM pg_database order by 2 limit 20;
 
 \qecho <h3>percent_towards_emergency_autovac & percent_towards_wraparound :</h3>
 
-WITH max_age AS ( SELECT 2000000000 as max_old_xid , setting AS 
+WITH max_age AS ( SELECT 2^31-1000000 as max_old_xid , setting AS 
 autovacuum_freeze_max_age FROM pg_catalog.pg_settings 
 WHERE name = 'autovacuum_freeze_max_age' ) , 
 per_database_stats AS ( SELECT datname , m.max_old_xid::int , 
-m.autovacuum_freeze_max_age::int , age(d.datfrozenxid) AS oldest_xid 
+m.autovacuum_freeze_max_age::int , age(d.datfrozenxid) AS oldest_current_xid 
 FROM pg_catalog.pg_database d JOIN max_age m ON (true) WHERE d.datallowconn ) 
-SELECT max(oldest_xid) AS oldest_xid , 
-max(ROUND(100*(oldest_xid/max_old_xid::float))) AS percent_towards_wraparound
- , max(ROUND(100*(oldest_xid/autovacuum_freeze_max_age::float))) AS percent_towards_emergency_autovac 
+SELECT max(oldest_current_xid) AS oldest_current_xid , 
+max(ROUND(100*(oldest_current_xid/max_old_xid::float))) AS percent_towards_wraparound
+ , max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_emergency_autovac 
  FROM per_database_stats ;
 
 
@@ -225,7 +225,7 @@ max(ROUND(100*(oldest_xid/max_old_xid::float))) AS percent_towards_wraparound
 
 SELECT datname,usename,state,query,
 now() - pg_stat_activity.query_start AS duration, 
-wait_event from pg_stat_activity where query like 'autovacuum:%' order by 4;
+wait_event from pg_stat_activity where query ~ '^autovacuum:' order by 5;
 
 
 
@@ -233,7 +233,7 @@ wait_event from pg_stat_activity where query like 'autovacuum:%' order by 4;
 
 SELECT datname,usename,state,query,
 now() - pg_stat_activity.query_start AS duration,
- wait_event from pg_stat_activity where query like 'vacuum:%' order by 4;
+ wait_event from pg_stat_activity where query ~* '\A\s*vacuum\M' order by 5;
 
 
 \qecho <h3>vacuum progress process:</h3>
@@ -263,7 +263,7 @@ select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin
 from pg_replication_slots where active = false order by age(xmin) desc;
 
 
-\qecho <h3>active replication slots order by age_xmin:</h3>
+\qecho <h3>Active replication slots order by age_xmin:</h3>
 
 select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
 from pg_replication_slots 
@@ -371,7 +371,7 @@ order by 2 desc limit 20;
 
 
 
-\qecho <h3>indexs inforamtion for Top-20 tables order by xid age:</h3>
+\qecho <h3>Indexs Inforamtion for Top-20 tables order by xid age:</h3>
 
 SELECT schemaname,relname AS tablename,
 indexrelname AS indexname,
@@ -496,16 +496,26 @@ SELECT * from pg_settings where category like 'Autovacuum';
 SELECT *  FROM pg_settings where name in ('rds.force_autovacuum_logging_level','log_autovacuum_min_duration') order by category;
 \qecho <br>
 \qecho </details>
--- currnt running  vacuum porecess
 \qecho <br>
-\qecho <h3>currnt running autovacuum porecess:</h3>
+\qecho <h3>current running autovacuum process:</h3>
 \qecho <br>
 \qecho <details>
-SELECT datname,usename,state,query,now() - pg_stat_activity.query_start AS duration, wait_event from pg_stat_activity where query like 'autovacuum:%' order by 4;
+SELECT datname,usename,state,query,
+now() - pg_stat_activity.query_start AS duration, 
+wait_event from pg_stat_activity where query ~ '^autovacuum:' order by 5;
+\qecho <br>
+\qecho </details>
+\qecho <br>
+\qecho <h3>current running vacuum process:</h3>
+\qecho <br>
+\qecho <details>
+SELECT datname,usename,state,query,
+now() - pg_stat_activity.query_start AS duration,
+ wait_event from pg_stat_activity where query ~* '\A\s*vacuum\M' order by 5;
 \qecho </details>
 \qecho <br>
 --  Whenever VACUUM is running, the pg_stat_progress_vacuum view will contain one row for each backend (including autovacuum worker processes) that is currently vacuuming (vacuum porgress)
-\qecho <h3>Vacuum porgress:</h3>
+\qecho <h3>Vacuum progress:</h3>
 \qecho <br>
 \qecho <details>
 SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'|| wait_event, 'f') AS waiting, CASE WHEN a.query ~ '^autovacuum.*to prevent wraparound' THEN 'wraparound' WHEN a.query ~ '^vacuum' THEN 'user' ELSE 'regular' END AS mode, p.datname AS database, p.relid::regclass AS table, p.phase, pg_size_pretty(p.heap_blks_total * current_setting('block_size')::int) AS table_size, pg_size_pretty(pg_total_relation_size(relid)) AS total_size, pg_size_pretty(p.heap_blks_scanned * current_setting('block_size')::int) AS scanned, pg_size_pretty(p.heap_blks_vacuumed * current_setting('block_size')::int) AS vacuumed, round(100.0 * p.heap_blks_scanned / p.heap_blks_total, 1) AS scanned_pct, round(100.0 * p.heap_blks_vacuumed / p.heap_blks_total, 1) AS vacuumed_pct, p.index_vacuum_count, round(100.0 * p.num_dead_tuples / p.max_dead_tuples,1) AS dead_pct FROM pg_stat_progress_vacuum p JOIN pg_stat_activity a using (pid) ORDER BY now() - a.xact_start DESC;
@@ -514,13 +524,13 @@ SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'||
 \qecho <h3>Autovacuum progress per day: </h3>
 \qecho <br>
 \qecho <details>
-select to_char(last_autovacuum, 'YYYY-MM-DD') , count(*) from pg_stat_all_tables   group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
+select to_char(last_autovacuum, 'YYYY-MM-DD') as date , count(*) from pg_stat_all_tables   group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Autoanalyze progress per day: </h3>
 \qecho <br>
 \qecho <details>
-select to_char(last_autoanalyze, 'YYYY-MM-DD') , count(*) from pg_stat_all_tables   group by to_char(last_autoanalyze, 'YYYY-MM-DD') order by 1;
+select to_char(last_autoanalyze, 'YYYY-MM-DD') as date , count(*) from pg_stat_all_tables   group by to_char(last_autoanalyze, 'YYYY-MM-DD') order by 1;
 \qecho </details>
 \qecho <br>
 --Which tables are currently eligible for autovacuum based on curret parameters
@@ -562,7 +572,7 @@ SELECT name, setting FROM pg_settings WHERE name='track_counts';
 \qecho </details>
 \qecho <br>
 -- to check the number of dead rows for the top 50 table
-\qecho <h3>Number of dead rows for the top 50 table : </h3>
+\qecho <h3>Top 50 tables based on number of dead tuples: </h3>
 \qecho <br>
 \qecho <details>
 select relname,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze  from pg_stat_all_tables order by n_dead_tup desc limit 50;
@@ -651,7 +661,7 @@ SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "S
 FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
 ORDER BY 1;
 \qecho <br>
-\qecho <h3>Available Extension versions that are available to upgrade the instaelled Extension: </h3>
+\qecho <h3>Available Extension versions that are available to upgrade the installed Extension: </h3>
 select b.name as extension_name , b.version as version ,b.installed as installed
 from
 (SELECT extname ,extversion FROM pg_extension) a ,
@@ -660,7 +670,7 @@ where a.extname = b.name
 and b.version > a.extversion
 order by b.name , b.version;
 \qecho <br>
-\qecho <h3>Latest Extension version that is available to upgrade the instaelled Extension: </h3>
+\qecho <h3>Latest Extension version that is available to upgrade the installed Extension: </h3>
 select name as extension_name , max(version) as latest_version
 from
 (select b.name , b.version ,b.installed
@@ -919,11 +929,103 @@ select * FROM pg_user;
 \qecho <a name="Schema_Info"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Schema Info</b></font><hr align="left" width="460">
 \qecho <br>
+\qecho <h3>List of schemas:</h3>
+\qecho <br>
 \qecho <details>
--- List of schema
 \dn+
 \qecho </details>
-
+\qecho <br>
+\qecho <h3>Total objects Count in the database:</h3>
+\qecho <br>
+\qecho <details>
+select count (*) from pg_catalog.pg_class;
+\qecho </details>
+\qecho <br>
+\qecho <h3>objects count per schema :</h3>
+\qecho <br>
+\qecho <details>
+select 
+n.nspname as schema_name, count (*) 
+from pg_catalog.pg_class c
+lEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+GROUP BY n.nspname
+order by  2 desc ;
+\qecho </details>
+\qecho <br>
+\qecho <h3>object type count per schema:</h3>
+\qecho <br>
+\qecho <details>
+SELECT
+n.nspname as schema_name
+,CASE c.relkind
+   WHEN 'r' THEN 'table'
+   WHEN 'v' THEN 'view'
+   WHEN 'i' THEN 'index'
+   WHEN 'S' THEN 'sequence'
+   WHEN 't' THEN 'TOAST table'
+   WHEN 'm' THEN 'materialized view'
+   WHEN 'c' THEN 'composite type'
+   WHEN 'f' THEN 'foreign table'
+   WHEN 'p' THEN 'partitioned table'
+   WHEN 'I' THEN 'partitioned index'
+END as object_type
+,count(1) as object_count
+FROM pg_catalog.pg_class c
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r','v','i','S','s')
+GROUP BY  n.nspname,
+CASE c.relkind
+   WHEN 'r' THEN 'table'
+   WHEN 'v' THEN 'view'
+   WHEN 'i' THEN 'index'
+   WHEN 'S' THEN 'sequence'
+   WHEN 't' THEN 'TOAST table'
+   WHEN 'm' THEN 'materialized view'
+   WHEN 'c' THEN 'composite type'
+   WHEN 'f' THEN 'foreign table'
+   WHEN 'p' THEN 'partitioned table'
+   WHEN 'I' THEN 'partitioned index'
+END
+ORDER BY n.nspname,
+CASE c.relkind
+   WHEN 'r' THEN 'table'
+   WHEN 'v' THEN 'view'
+   WHEN 'i' THEN 'index'
+   WHEN 'S' THEN 'sequence'
+   WHEN 't' THEN 'TOAST table'
+   WHEN 'm' THEN 'materialized view'
+   WHEN 'c' THEN 'composite type'
+   WHEN 'f' THEN 'foreign table'
+   WHEN 'p' THEN 'partitioned table'
+   WHEN 'I' THEN 'partitioned index'
+END;
+\qecho </details>
+\qecho <br>
+\qecho <h3>list of objects:</h3>
+\qecho <br>
+\qecho <details>
+select nsp.nspname as schema,
+       rol.rolname as owner, 
+       cls.relname as object_name,        
+       case cls.relkind
+         WHEN 'r' THEN 'table'
+         WHEN 'v' THEN 'view'
+         WHEN 'i' THEN 'index'
+         WHEN 'S' THEN 'sequence'
+         WHEN 't' THEN 'TOAST table'
+         WHEN 'm' THEN 'materialized view'
+         WHEN 'c' THEN 'composite type'
+         WHEN 'f' THEN 'foreign table'
+         WHEN 'p' THEN 'partitioned table'
+         WHEN 'I' THEN 'partitioned index'
+         else cls.relkind::text
+       end as object_type
+from pg_class cls
+  join pg_roles rol on rol.oid = cls.relowner
+  join pg_namespace nsp on nsp.oid = cls.relnamespace
+order by 1,2,4;
+\qecho </details>
+\qecho <br>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -1431,12 +1533,26 @@ ORDER BY 8 desc;
 \qecho <a name="Toast_Tables_Mapping"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Toast Tables Mapping</b></font><hr align="left" width="460">
 \qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> When a column is written to the toast table, an OID is used to identify the chunk to be toasted. When a toast table grows very large, and contains chunk_ids that are nearing the value of 2^32, it can lead to performance degredation when writing to toast. This is because PostgreSQL must check if an OID is available for assignment by scanning the table </h4>
+\qecho <h4> A large Toast table can be a good indication that your toast can face OID wraparound </h4>
+\qecho <h4> over time the insert statement will be slower as the Database will be searching for an unused OID and it will have to read from the disk , you will see the insert statements is waiting on IPC:BufferiO or IO:DataFileRead  </h4>
+\qecho <h4> you can use below SQL to check the toast table  </h4>
+\qecho <h4> select COUNT(DISTINCT chunk_id),2^31 - COUNT(DISTINCT chunk_id) as remaining_OID ,ROUND(100*((2^31 - COUNT(DISTINCT chunk_id)))/2^31::float) AS remaining_OID_PCT ,ROUND(100*(COUNT(DISTINCT chunk_id)/2^31::float)) as percent_towards_Toast_oid_wraparound from pg_toast.pg_toast_{number};</h4> 
+\qecho <br>
+\qecho <h4> when the toast hits the OID wraparound, you will see the following wait event LWLock:OidGen and the insert statements will fail and you will see below error in the log file </h4>
+\qecho <br>
+\qecho <h4> :LOG:  still searching for an unused OID in relation "pg_toast_{number}"  </h4>
+\qecho <h4> :DETAIL:  OID candidates have been checked 1000000 times, but no unused OID has been found yet. </h4>
+\qecho <br>
+\qecho <h3>Toast Tables Mapping and sizes:</h3>
+\qecho <br>
 \qecho <details>
-select t.relname table_name, r.relname toast_name, pg_size_pretty(pg_relation_size(t.reltoastrelid)) as toast_size
+select t.relname table_name, r.relname toast_name,r.oid as toast_oid, pg_relation_size(t.reltoastrelid) as toast_size_bytes  ,pg_size_pretty(pg_relation_size(t.reltoastrelid)) as toast_size
 FROM
     pg_class r
 INNER JOIN pg_class t ON r.oid = t.reltoastrelid
-order by r.relname ;
+order by toast_size_bytes desc ;  
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -1515,26 +1631,62 @@ WHERE name in ('wal_level','max_wal_senders','max_replication_slots',
 \qecho <a name="sessions_info"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Sessions/Connections Info</b></font><hr align="left" width="460">
 \qecho <br>
-\qecho <details>
 \qecho <h3>Connections utilization:</h3>
+\qecho <br>
+\qecho <details>
 with
 settings as (SELECT setting::float AS "max_connections" FROM pg_settings WHERE name = 'max_connections'),
 connections as (select sum (numbackends)::float total_connections from pg_stat_database)
 select   settings.max_connections AS "Max_connections" ,total_connections as "Total_connections",ROUND((100*(connections.Total_connections/settings.max_connections))::numeric,2) as "Connections utilization %" from  settings, connections;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Reserved connections settings:</h3>
+\qecho <br>
+\qecho <details>
+select  name as parameter_name , setting , short_desc from pg_settings WHERE name in ('superuser_reserved_connections', 'rds.rds_superuser_reserved_connections');
+\qecho </details>
+\qecho <br>
 \qecho <h3> DB/Connections count :</h3>
+\qecho <br>
+\qecho <details>
 SELECT datname as "Database_Name",count(*) as "Connections_count" FROM pg_stat_activity where datname is not null group by datname order by 2 desc;
+\qecho </details>
+\qecho <br>
 \qecho <h3> DB/username/Connections count :</h3>
+\qecho <br>
+\qecho <details>
 SELECT datname as "Database_Name",usename as "User_Name" ,count(*) as "Connections_count" FROM pg_stat_activity  where datname is not null  group by datname,usename order by 1,3 desc;
+\qecho </details>
+\qecho <br>
 \qecho <h3> username/Connections count :</h3>
+\qecho <br>
+\qecho <details>
 SELECT usename as "User_Name",count(*) as "connections_count" FROM pg_stat_activity  where datname is not null  group by usename order by 2 desc;
+\qecho </details>
+\qecho <br>
 \qecho <h3> username/status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
 SELECT usename as "User_Name",state as status,count(*) as "Connections_count" FROM pg_stat_activity  where datname is not null group by usename,state order by 1,2 desc;
+\qecho </details>
+\qecho <br>
+\qecho <h3> DB/username/status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+select datname as "Database_Name" ,usename as "User_Name",state as status,count(*) as "Connections_count" FROM pg_stat_activity where datname is not null group by datname ,usename,state order by 4 desc;
+\qecho </details>
+\qecho <br>
 \qecho <h3> status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
 SELECT state as status ,count(*) as "Connections_count" FROM pg_stat_activity where datname is not null GROUP BY status order by 2 desc;
+\qecho </details>
+\qecho <br>
 \qecho <h3> username/status/SQL/count : </h3>
+\qecho <br>
+\qecho <details>
 SELECT usename as "User_Name" , state as status , query, count(*) FROM pg_stat_activity where datname is not null group by usename,state,query ;
 \qecho </details>
-
 \qecho <br>
 \qecho <h3>Active sessions:</h3>
 \qecho <br>
@@ -2212,13 +2364,13 @@ order by total_time desc;
 \qecho <a name="DB_Load"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB Load</b></font><hr align="left" width="460">
 \qecho <br>
-\qecho <h3>How many session waiting on CPU and None CPU wait event:</h3>
+\qecho <h3>How many session waiting on CPU and Non CPU wait event:</h3>
 \qecho <details>
 select coalesce(count(*),'0') as  count_of_sessions_waiting_on_CPU
 FROM pg_stat_activity 
 where wait_event is null and state = 'active' group by wait_event ;
 \qecho <br>
-select coalesce(sum(count),'0') as count_of_sessions_waiting_on_None_CPU
+select coalesce(sum(count),'0') as count_of_sessions_waiting_on_Non_CPU
 from (SELECT count(*) as count
 FROM pg_stat_activity  
 where wait_event is not null and state = 'active' 
