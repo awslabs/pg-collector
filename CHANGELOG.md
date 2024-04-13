@@ -23,3 +23,15 @@ All notable changes to pg collector will be documented in this file.
 8- Add Sessions statistics ( session_time,active_time,idle_in_transaction_time,sessions,sessions_abandoned,sessions_fatal,sessions_killed ) to Sessions/Connections Info section 
 9- Add Replication Slot wal status to Replication section
 ```
+
+#  V1.2
+
+```
+1- Enhance the where condition in the following sections “current running vacuum process“and ”current running autovacuum process“.
+2- Fix typos, Thanks to Vikas Gupta for highlighting them .
+3- Upade percent_towards_wraparound's query with 2^31-3000000 as in 14 the wraparound safety margin increased from 1 million to 3 million.
+4- Add reserved connections parameters info to the Connections Info section .
+5- Add DB/username/status/Connections count to the Connections Info section .
+6- Add objects list and count in each schema to the schema info section .
+7- Update the Toast Tables Mapping's sql to order the toast by the size and add note about toast OID wraparound
+```
