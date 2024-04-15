@@ -4,8 +4,8 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1.2 for PostgreSQL 14                                                                        |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-14/CHANGELOG.md    | 
+-- |  -- version : V1 for PostgreSQL 15                                                                        |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-15/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -62,8 +62,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.2 for PostgreSQL 14</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-14" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 15</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-15" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -101,7 +101,7 @@ select  now () as "Date" ,pg_postmaster_start_time() as "DB_START_DATE", current
 \qecho <br>
 \l+
 \qecho <br>
-select datname as Database_name , datistemplate as database_is_template ,datallowconn as database_allow_connections, datconnlimit as database_connection_limit , datlastsysoid ,datfrozenxid ,datminmxid   from pg_database; 
+select * from pg_database; 
 \qecho <br>
 \qecho <br>
 \qecho <table width="90%" border="1"> 
