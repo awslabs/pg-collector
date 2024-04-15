@@ -4,8 +4,8 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1 for PostgreSQL 15                                                                        |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-15/CHANGELOG.md    | 
+-- |  -- version : V1 for PostgreSQL 16                                                                        |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-16/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -62,8 +62,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 15</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-15" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 16</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-16" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -1655,7 +1655,7 @@ select   settings.max_connections AS "Max_connections" ,total_connections as "To
 \qecho <h3>Reserved connections settings:</h3>
 \qecho <br>
 \qecho <details>
-select  name as parameter_name , setting , short_desc from pg_settings WHERE name in ('superuser_reserved_connections', 'rds.rds_superuser_reserved_connections');
+select  name as parameter_name , setting , short_desc from pg_settings WHERE name in ('superuser_reserved_connections', 'reserved_connections');
 \qecho </details>
 \qecho <br>
 \qecho <h3>Sessions statistics:</h3>
