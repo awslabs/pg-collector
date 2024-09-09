@@ -4,14 +4,13 @@
 -- |  -- Create Date : 16 SEPT 2019                                                    |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations              |
 -- |                   and generate HTML Report                                        |
--- |  -- version : V 3                                                               |
+-- |  -- version : V 3.1                                                               |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/main/CHANGELOG.md    |                                                                |
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                |
 -- | SPDX-License-Identifier: MIT-0                                                    |
 -- +-----------------------------------------------------------------------------------+
 \H
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
-\echo Report name and location: /tmp/pg_collector_:filename.html
 \o /tmp/pg_collector_:filename.html
 \pset footer  off
 \qecho <style type='text/css'> 
@@ -62,7 +61,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V3</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V3.1</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
@@ -169,6 +168,36 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <tr>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#triggers">Triggers</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_config">pg_config</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Invalid_databases">Invalid databases</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho </tr>
+\qecho </table>
+\qecho <br>
+\qecho <br>
+\qecho <br>
+\qecho <table width="90%" border="1">
+\qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>Amazon Aurora PostgreSQL</b></font></div></th></tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_version">Aurora version</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_PostgreSQL_built-in_functions">Aurora PostgreSQL built-in functions</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_db_instance_identifier">Aurora db instance identifier</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_cluster_instances">Aurora cluster instances</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_reader_instances-Replica_Lag">Aurora reader instances - Replica Lag</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_cluster_cache_management_(CCM)">Aurora cluster cache management (CCM)</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_global_db_status">Aurora global db status</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_wait_event_stat">Aurora wait event stat</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#query_plan_management">Query Plan Management (QPM)</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Aurora_dml_activity">Aurora DML activity</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#process_memory_context_usage">process memory context usage</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#logical_replication_write_through_cache">Logical replication write-through cache</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
@@ -176,6 +205,7 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <br>
 \qecho <br>
 \qecho <br>
+
 
 -- +----------------------------------------------------------------------------+
 -- |      - Database_size                                    -                  |
@@ -270,6 +300,12 @@ from pg_replication_slots
 where active = true 
 order by age(xmin) desc;
 
+\qecho <h3>Invalid databases count:</h3> 
+select count(*) FROM pg_database WHERE datconnlimit = '-2' ;
+
+
+\qecho <h3>Invalid databases list:</h3> 
+SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
 
 \qecho <h3>Orphaned prepared transactions:</h3>
 
@@ -339,16 +375,22 @@ ORDER BY age(relfrozenxid) DESC ;
 
 
 \qecho <h3>autovacuum progress per day:</h3>
+\qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> This section presents the number of tables that have been vacuumed by the autovacuum , grouped by the date (in the format YYYY-MM-DD) of the last_autovacuum column. </h4>
+\qecho <h4> If the value in the date column is NULL, it indicates that the corresponding value in the table count column represents the number of tables that the autovacuum did not vacuum. </h4>
+\qecho <br>
 
-select to_char(last_autovacuum, 'YYYY-MM-DD') as date, 
-count(*) from pg_stat_all_tables   
-group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
+select to_char(last_autovacuum, 'YYYY-MM-DD') as date , count(*) as table_count from pg_stat_all_tables   group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
+
 
 
  
-\qecho <h3>when the last autovacuum succeeded ?</h3> 
-
-select relname as table_name,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, 
+\qecho <h3>The most recent 20 tables that have been vacuumed by the autovacuum:</h3> 
+\qecho <h3> Note:</h3>
+\qecho <h4> - If the value in the last_autovacuum column is NULL, it indicates that the autovacuum  did not vacuum this table. </h4>
+\qecho <br>
+select schemaname as schema_name,relname as table_name,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, 
 last_vacuum, last_autovacuum, last_analyze, last_autoanalyze 
 from pg_stat_all_tables 
 order by last_autovacuum desc limit 20 ;
@@ -371,7 +413,7 @@ order by 2 desc limit 20;
 
 
 
-\qecho <h3>Indexs Inforamtion for Top-20 tables order by xid age:</h3>
+\qecho <h3>Index Inforamtion for Top-20 tables order by xid age:</h3>
 
 SELECT schemaname,relname AS tablename,
 indexrelname AS indexname,
@@ -425,6 +467,8 @@ order by 2,8 desc;
 \qecho <br>
 \qecho <h3>biggest 50 tables in the DB: </h3>
 \qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> - If the table has never yet been vacuumed or analyzed, ROW_ESTIMATE column (pg_class.reltuples) contains -1 indicating that the row count is unknown. </h4>
 \qecho <details>
 SELECT *, pg_size_pretty(total_bytes) AS TOTAL_PRETTY
     , pg_size_pretty(index_bytes) AS INDEX_PRETTY
@@ -471,7 +515,7 @@ FROM pg_catalog.pg_statio_all_indexes  ORDER BY 1,2 desc ;
 \qecho <br>
 \qecho <details>
 SELECT
-schemaname,relname as "Table",
+schemaname as schema_name,relname as "Table",
 indexrelname AS indexname,
 pg_relation_size(indexrelid),
 pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
@@ -523,14 +567,22 @@ SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'||
 \qecho <br>
 \qecho <h3>Autovacuum progress per day: </h3>
 \qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> This section presents the number of tables that have been vacuumed by the autovacuum , grouped by the date (in the format YYYY-MM-DD) of the last_autovacuum column. </h4>
+\qecho <h4> If the value in the date column is NULL, it indicates that the corresponding value in the table count column represents the number of tables that the autovacuum did not vacuum. </h4>
+\qecho <br>
 \qecho <details>
-select to_char(last_autovacuum, 'YYYY-MM-DD') as date , count(*) from pg_stat_all_tables   group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
+select to_char(last_autovacuum, 'YYYY-MM-DD') as date , count(*) as table_count from pg_stat_all_tables   group by to_char(last_autovacuum, 'YYYY-MM-DD') order by 1;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Autoanalyze progress per day: </h3>
 \qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> This section presents the number of tables that have been analyzed by the autoanalyze , grouped by the date (in the format YYYY-MM-DD) of the last_autoanalyze column. </h4>
+\qecho <h4> If the value in the date column is NULL, it indicates that the corresponding value in the table count column represents the number of tables that the autoanalyze did not analyze. </h4>
+\qecho <br>
 \qecho <details>
-select to_char(last_autoanalyze, 'YYYY-MM-DD') as date , count(*) from pg_stat_all_tables   group by to_char(last_autoanalyze, 'YYYY-MM-DD') order by 1;
+select to_char(last_autoanalyze, 'YYYY-MM-DD') as date , count(*) as table_count from pg_stat_all_tables   group by to_char(last_autoanalyze, 'YYYY-MM-DD') order by 1;
 \qecho </details>
 \qecho <br>
 --Which tables are currently eligible for autovacuum based on curret parameters
@@ -575,7 +627,7 @@ SELECT name, setting FROM pg_settings WHERE name='track_counts';
 \qecho <h3>Top 50 tables based on number of dead tuples: </h3>
 \qecho <br>
 \qecho <details>
-select relname,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze  from pg_stat_all_tables order by n_dead_tup desc limit 50;
+select schemaname as schema_name,relname AS table_name,n_live_tup, n_tup_upd, n_tup_del, n_dead_tup, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze  from pg_stat_all_tables order by n_dead_tup desc limit 50;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Tables have more than 20% dead rows :</h3>
@@ -764,6 +816,8 @@ FROM
 \qecho <a name="pg_stat_statements_extension"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>pg_stat_statements extension</b></font><hr align="left" width="460">
 \qecho <br>
+select count(*) > 0 is_pg_stat_statements_enabled FROM pg_catalog.pg_extension where extname = 'pg_stat_statements' \gset
+\if :is_pg_stat_statements_enabled
 \qecho <h3> pg_stat_statements installed version: </h3>
 \qecho <br>
 \qecho <details>
@@ -898,6 +952,11 @@ shared_blks_read
 from pg_stat_statements 
 order by shared_blks_read desc limit 20;
 \qecho </details>
+\else
+    \if yes
+        \qecho 'pg_stat_statements extension is not installed'
+    \endif
+\endif
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -1368,11 +1427,11 @@ order by physical_reads_percent desc limit 50 ;
 \qecho <details>
 SELECT
   current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
-  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_%",
+  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_ratio",
   CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END AS wastedbytes,
   pg_size_pretty(CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END) AS table_wasted_size,
   iname AS Index_nam, /*ituples::bigint, ipages::bigint, iotta,*/
-  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_%",
+  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_ratio",
   CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) END AS wastedibytes,
   pg_size_pretty(CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) ::BIGINT END) AS Index_wasted_size
 FROM (
@@ -1416,16 +1475,16 @@ ORDER BY wastedbytes DESC;
 \qecho </details>
 
 \qecho <br>
-\qecho <h3>Tables and indexes Bloat [Fragmentation] order by table wasted % :</h3>
+\qecho <h3>Tables and indexes Bloat [Fragmentation] order by table wasted ratio :</h3>
 \qecho <br>
 \qecho <details>
 SELECT
   current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
-  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_%",
+  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_ratio",
   CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END AS wastedbytes,
   pg_size_pretty(CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END) AS table_wasted_size,
   iname AS Index_nam, /*ituples::bigint, ipages::bigint, iotta,*/
-  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_%",
+  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_ratio",
   CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) END AS wastedibytes,
   pg_size_pretty(CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) ::BIGINT END) AS Index_wasted_size
 FROM (
@@ -1469,16 +1528,16 @@ ORDER BY 4 desc;
 \qecho </details>
 
 \qecho <br>
-\qecho <h3>Tables and indexes Bloat [Fragmentation] order by index wasted % :</h3>
+\qecho <h3>Tables and indexes Bloat [Fragmentation] order by index wasted ratio :</h3>
 \qecho <br>
 \qecho <details>
 SELECT
   current_database(), schemaname, tablename, /*reltuples::bigint, relpages::bigint, otta,*/
-  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_%",
+  ROUND((CASE WHEN otta=0 THEN 0.0 ELSE sml.relpages::FLOAT/otta END)::NUMERIC,1) AS "table_bloat_ratio",
   CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END AS wastedbytes,
   pg_size_pretty(CASE WHEN relpages < otta THEN 0 ELSE bs*(sml.relpages-otta)::BIGINT END) AS table_wasted_size,
   iname AS Index_nam, /*ituples::bigint, ipages::bigint, iotta,*/
-  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_%",
+  ROUND((CASE WHEN iotta=0 OR ipages=0 THEN 0.0 ELSE ipages::FLOAT/iotta END)::NUMERIC,1) AS "Index_bloat_ratio",
   CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) END AS wastedibytes,
   pg_size_pretty(CASE WHEN ipages < iotta THEN 0 ELSE bs*(ipages-iotta) ::BIGINT END) AS Index_wasted_size
 FROM (
@@ -2500,7 +2559,14 @@ order by table_id , trigger_status_code;
 \qecho <br>
 \qecho <h3> The view pg_config describes the compile-time configuration parameters of the currently installed version of PostgreSQL. </h3>
 \qecho <br>
-select * from pg_config();
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+\qecho 'pg_config() is currently not supported for Aurora'
+\else
+    \if yes
+        select * from pg_config();
+    \endif
+\endif
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -2521,6 +2587,31 @@ SELECT *  FROM pg_settings where name in ('rds.extensions') order by category;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
 -- +----------------------------------------------------------------------------+
+-- |      - Invalid_databases                                -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Invalid_databases"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Invalid databases</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3>If the DROP DATABASE command is interrupted, the database will become invalid,starting from versions 11.21 and later, 12.16 and later, 13.12 and later, 14.9 and later, 15.4 and later, all versions of 16 as well as PostgreSQL 16 and all subsequent major versions. </h3> 
+\qecho <h3>you will not be able to connect to it again. In this case, you will see the below error message: </h3>
+\qecho <h3>  failed: FATAL: cannot connect to invalid database <DB Name>  </h3> 
+\qecho <h3>  HINT: Use DROP DATABASE to drop invalid databases. </h3> 
+\qecho <details>
+\qecho <br>
+\qecho <h3>Invalid databases count:</h3> 
+select count(*) FROM pg_database WHERE datconnlimit = '-2' ;
+
+\qecho <br>
+\qecho <h3>Invalid databases list:</h3> 
+SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
 -- |      - *************                                    -                  |
 -- +----------------------------------------------------------------------------+
 
@@ -2534,5 +2625,400 @@ SELECT *  FROM pg_settings where name in ('rds.extensions') order by category;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_version                                   -                  |
+-- +----------------------------------------------------------------------------+
 
+
+\qecho <a name="Aurora_version"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora version</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT * FROM aurora_version();
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_PostgreSQL_built-in_functions             -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_PostgreSQL_built-in_functions"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora PostgreSQL built-in functions</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT * FROM aurora_list_builtins();
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_db_instance_identifier             -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_db_instance_identifier"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora db instance identifier</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT server_id,
+    CASE
+        WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
+        ELSE 'reader'
+    END AS instance_role
+FROM aurora_replica_status() rt,
+         aurora_db_instance_identifier() di
+    WHERE rt.server_id = di;
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_cluster_instances                  -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_cluster_instances"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora cluster instances</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+ SELECT server_id,
+    CASE
+        WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
+        ELSE 'reader'
+    END AS instance_role
+FROM aurora_replica_status() ;
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_reader_instances-Replica_Lag              -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_reader_instances-Replica_Lag"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora reader instances - Replica Lag</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT server_id, 
+    CASE 
+        WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
+        ELSE 'reader' 
+    END AS instance_role,
+    replica_lag_in_msec AS replica_lag_ms,
+    round(extract (epoch FROM (SELECT age(clock_timestamp(), last_update_timestamp))) * 1000) AS last_update_age_ms
+FROM aurora_replica_status()
+ORDER BY replica_lag_in_msec NULLS FIRST;
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_cluster_cache_management_(CCM)            -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_cluster_cache_management_(CCM)"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora cluster cache management (CCM)</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT *  FROM aurora_ccm_status();
+SELECT buffers_sent_last_minute * 8/60 AS warm_rate_kbps,
+100 * (1.0-buffers_sent_last_scan/buffers_found_last_scan) AS warm_percent 
+FROM aurora_ccm_status ();
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_global_db_status                          -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_global_db_status"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora global db status</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT CASE 
+          WHEN '-1' = durability_lag_in_msec THEN 'Primary'
+          ELSE 'Secondary'
+       END AS global_role,
+       *
+  FROM aurora_global_db_status();
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_wait_event_stat                        -                     |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Aurora_wait_event_stat"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora wait event stat</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> aurora_stat_system_waits()function returns the cumulative number of waits and cumulative wait time for each wait event generated by the DB instance that you are currently connected to.</h4>
+\qecho <h4> Statistics returned by this function are reset when a DB instance restarts.</h4>
+\qecho <h4> waits :The number of times the wait event occurred.</h4>
+\qecho <h4> wait_time : The total amount of time in microseconds spent waiting for this event.</h4>
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+SELECT type_name as wait_event_type,
+             event_name as wait_event_name,
+             waits,
+             wait_time
+        FROM aurora_stat_system_waits()
+NATURAL JOIN aurora_stat_wait_event()
+NATURAL JOIN aurora_stat_wait_type() order by wait_time desc;
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - query_plan_management                            -                  |
+-- +----------------------------------------------------------------------------+
+
+\qecho <a name="query_plan_management"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Query Plan Management (QPM)</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+select count(*) > 0 is_apg_plan_mgmt_enabled FROM pg_catalog.pg_extension where extname = 'apg_plan_mgmt' \gset
+select count(*) = 0 is_apg_plan_mgmt_not_enabled FROM pg_catalog.pg_extension where extname = 'apg_plan_mgmt' \gset
+\if :isaurora
+    \if :is_apg_plan_mgmt_not_enabled
+       \qecho 'Query Plan Management (QPM) is not enabled'
+    \else
+       \if :is_apg_plan_mgmt_enabled
+        show rds.enable_plan_management ;
+        SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
+        FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+        where e.extname = 'apg_plan_mgmt';
+        select * from pg_available_extensions where name='apg_plan_mgmt';
+        SELECT name ,version ,installed FROM pg_available_extension_versions where  name='apg_plan_mgmt' order by version;
+        select name,setting from pg_settings  where name like 'apg_plan_mgmt%';
+        with plans_stored_count as (select count(*) as cnt from apg_plan_mgmt.dba_plans)
+        select s.setting as max_plans, p.cnt as plans_stored_count, (p.cnt/s.setting::int)*100 as plans_stored_PCT_from_max_plans from pg_settings s, plans_stored_count p where s.name ='apg_plan_mgmt.max_plans';
+       \endif
+    \endif  
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Aurora_dml_activity                              -                  |
+-- +----------------------------------------------------------------------------+
+\qecho <a name="Aurora_dml_activity"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora dml activity</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora 
+with dml_details as (
+SELECT db.datname AS datname,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 1), '()'),'') AS select_count,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 2), '()'),'') AS select_latency_microsecs,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 3), '()'),'') AS insert_count,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 4), '()'),'') AS insert_latency_microsecs,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 5), '()'),'') AS update_count,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 6), '()'),'') AS update_latency_microsecs,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 7), '()'),'') AS delete_count,
+ NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 8), '()'),'') AS delete_latency_microsecs
+ FROM  (SELECT datname,
+        aurora_stat_dml_activity(oid) AS asdmla
+       FROM pg_database --where datname = 'rathoran_db'
+ ) AS db)
+select datname as database_name ,
+          select_count::numeric,
+          select_latency_microsecs::numeric,
+          TRUNC(select_latency_microsecs::numeric/NULLIF(select_count::numeric,0),3) select_latency_per_exec,
+          insert_count::numeric,
+          insert_latency_microsecs::numeric,
+          TRUNC(insert_latency_microsecs::numeric/NULLIF(insert_count::numeric,0),3) insert_latency_per_exec,
+          update_count::numeric,
+          update_latency_microsecs::numeric,
+          TRUNC(update_latency_microsecs::numeric/NULLIF(update_count::numeric,0),3) update_latency_per_exec,
+          delete_count::numeric,
+          delete_latency_microsecs::numeric,
+          TRUNC(delete_latency_microsecs::numeric/NULLIF(delete_count::numeric,0) ,3)delete_latency_per_exec
+       FROM dml_details
+       order by select_count desc;
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+-- +----------------------------------------------------------------------------+
+-- |      - process_memory_context_usage                              -         |
+-- +----------------------------------------------------------------------------+
+\qecho <a name="process_memory_context_usage"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Process memory context usage</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+select count(*) > 0 isaurora1215plus FROM aurora_version() where replace(substring(aurora_version, 1, 5),'.','')::int >= '1215' \gset 
+\if :isaurora1215plus
+\qecho <br>
+\qecho <h3> The allocated memory for each memory context across all the processes ordered by allocated memory: </h3>
+\qecho <br>
+select
+name, sum(allocated) as allocated_size_bytes,
+ pg_size_pretty(sum(allocated)) as allocated_size,
+ pg_size_pretty(sum(used)) as used_size,
+ trunc(sum(used)/sum(allocated)*100,2) as used_pct,
+  sum(instances) as instances_count
+ from aurora_stat_memctx_usage()
+ group by name
+ order by allocated_size_bytes desc;
+\qecho <br>
+\qecho <h3> The top 50 porcess with the highest allocated memory: </h3>
+\qecho <br>
+select
+pid, sum(allocated) as allocated_size_bytes ,pg_size_pretty(sum(allocated)) as allocated_size , pg_size_pretty(sum(used)) as used_size,
+trunc(sum(used)/sum(allocated)*100,2) as used_pct
+from aurora_stat_memctx_usage()
+group by pid order by allocated_size_bytes desc
+limit 50;
+
+\qecho <br>
+\qecho <h3> The top 50 porcess with the highest allocated memory including process information in pg_stat_activity view: </h3>
+\qecho <br>
+WITH memctx  AS
+  (select
+pid, sum(allocated) as allocated_size_bytes ,pg_size_pretty(sum(allocated)) as allocated_size , pg_size_pretty(sum(used)) as used_size,
+trunc(sum(used)/sum(allocated)*100,2) as used_pct 
+from aurora_stat_memctx_usage()
+group by pid order by allocated_size_bytes desc
+limit 50
+  )
+select *
+from pg_stat_activity ps
+INNER JOIN memctx ON ps.pid = memctx.pid
+order by memctx.allocated_size_bytes desc ;
+\qecho <br>
+\qecho <h3> The top 50 processes with the highest allocated memory and the breakdown of their memory usage of each memory context: </h3>
+\qecho <br>
+WITH memctx as
+(select
+pid, sum(allocated) as allocated_size_bytes
+from aurora_stat_memctx_usage()
+group by pid order by allocated_size_bytes desc
+limit 50 )
+select pid ,name , allocated as allocated_size_bytes ,pg_size_pretty(allocated) as allocated_size , pg_size_pretty(used) as used_size , instances as instances_count from aurora_stat_memctx_usage() where pid in
+(select pid from memctx )
+order by PID, allocated_size_bytes desc;
+\else
+    \if yes
+        \qecho 'aurora_stat_memctx_usage function is only available staring from Aurora PostgreSQL version 12.15'
+    \endif
+\endif
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - logical_replication_write_through_cache          -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="logical_replication_write_through_cache"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Logical replication write-through cache</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+select count(*) > 0 isaurora1212plus FROM aurora_version() where replace(substring(aurora_version, 1, 5),'.','')::int >= '1212' \gset
+\if :isaurora1212plus
+SELECT * FROM aurora_stat_logical_wal_cache();
+\else
+    \if yes
+        \qecho 'aurora_stat_logical_wal_cache function is only available staring from Aurora PostgreSQL version 12.12'
+    \endif
+\endif
+\else
+    \if yes
+        \qecho 'This is not Aurora instance'
+    \endif
+\endif
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+\echo Report Generated Successfully
+\echo Report name and location: /tmp/pg_collector_:filename.html
 \q

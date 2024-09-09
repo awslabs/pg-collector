@@ -127,7 +127,7 @@ mohamed@mydevhost ~ %ls -lhrt /tmp/pg_colletcor_*
 
 
 ## Notes:
-1- it is ok to see below errors while executing the pg_colletcor.sql script if you did not install pg_stat_statements extension
+1- It is ok to see below errors while executing the pg_colletcor.sql script if you did not install pg_stat_statements extension
 
 ```
 postgres=> \i pg_collector.sql
@@ -148,7 +148,7 @@ LINE 10: from pg_stat_statements
 postgres=> \q
 ```
 
-2- if the Database have Tens of thousands of tables , some queries can take longer time .
+2- If the Database have Tens of thousands of tables , some queries can take longer time .
 use statement_timeout to Abort any statement that takes more than the specified number of milliseconds.
 please check below example .  
 
@@ -164,6 +164,17 @@ postgres=>
 
 ```
 
+3- It is acceptable to observe the following errors while executing the pg_collector.sql script on Amazon Aurora PostgreSQL if the Cluster Cache Manager is disabled.
+
+```
+postgres=> \i pg_collector.sql
+Output format is html.
+psql:/tmp/pg_collector.sql:2766: ERROR: Cluster Cache Manager is disabled
+psql:/tmp/pg_collector.sql:2769: ERROR: Cluster Cache Manager is disabled
+Report Generated Successfully
+Report name and location: /tmp/pg_collector_postgres-2024-09-09_161216.html
+
+```
 
 # License
 
