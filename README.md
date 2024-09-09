@@ -139,6 +139,17 @@ postgres=>
 
 ```
 
+3- It is acceptable to observe the following errors while executing the pg_collector.sql script on Amazon Aurora PostgreSQL if the Cluster Cache Manager is disabled.
+
+```
+postgres=> \i pg_collector.sql
+Output format is html.
+psql:/tmp/pg_collector.sql:2766: ERROR: Cluster Cache Manager is disabled
+psql:/tmp/pg_collector.sql:2769: ERROR: Cluster Cache Manager is disabled
+Report Generated Successfully
+Report name and location: /tmp/pg_collector_postgres-2024-09-09_161216.html
+
+```
 
 # License
 
