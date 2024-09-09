@@ -32,3 +32,12 @@ following pg_stat_statements columns renamed:
 6- Add objects list and count in each schema to the schema info section .
 7- Update the Toast Tables Mapping's sql to order the toast by the size and add note about toast OID wraparound
 ```
+
+#  V1.3
+
+```
+1- The script should display the message "Report Generated Successfully" upon successful completion and relocate the report file name and location information to the end of the script..
+2- Add a new section for Amazon Aurora PostgreSQL.
+3- Add a new section for Invalid databases.
+4- Implement a check for the pg_stat_statements extension. If the extension is not installed, the script should print the message "pg_stat_statements extension is not installed" in the report, instead of displaying the errors "ERROR: relation "pg_stat_statements_info" does not exist" or "ERROR: relation "pg_stat_statements" does not exist".
+```
