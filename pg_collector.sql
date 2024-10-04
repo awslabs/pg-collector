@@ -863,21 +863,21 @@ where r.extension_name='pg_stat_statements';
 \qecho </details>
 
 \qecho <br>
-\qecho <h3> Top SQL order by total_time: </h3>
+\qecho <h3> Top SQL order by total_exec_time: </h3>
 \qecho <br>
 \qecho <details>
---Top SQL order by total_time
+--Top SQL order by total_exec_time
 select queryid,substring(query,1,60) as query , calls, 
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(total_exec_time::numeric, 2) as total_exec_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_exec_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
-order by total_time_Msec desc limit 20;
+order by total_exec_time_Msec desc limit 20;
 \qecho </details>
 
 \qecho <br>
@@ -886,14 +886,14 @@ order by total_time_Msec desc limit 20;
 \qecho <details>
 --Top SQL order by avg_time
 select queryid,substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(total_exec_time::numeric, 2) as total_exec_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_exec_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by avg_time_Msec desc limit 20;
 \qecho </details>
@@ -904,14 +904,14 @@ order by avg_time_Msec desc limit 20;
 \qecho <details>
 --Top SQL order by percent of total DB time
 select queryid,substring(query,1,60) as query , calls, 
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(total_exec_time::numeric, 2) as total_exec_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_exec_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by percent desc limit 20;
 \qecho </details>
@@ -922,14 +922,14 @@ order by percent desc limit 20;
 \qecho <details>
 --Top SQL order by number of execution (CALLs)  
 select queryid,substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(total_exec_time::numeric, 2) as total_exec_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_exec_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by calls desc limit 20;
 \qecho </details>
@@ -940,14 +940,14 @@ order by calls desc limit 20;
 \qecho <details>
 --Top SQL order by shared blocks read (physical reads) 
 select queryid, substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(total_exec_time::numeric, 2) as total_exec_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_exec_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
 shared_blks_read
 from pg_stat_statements 
 order by shared_blks_read desc limit 20;
@@ -2387,7 +2387,7 @@ SELECT name,setting from pg_settings where name ='track_functions';
 \qecho <br>
 select
 schemaname||'.'||funcname func_name, calls, total_time,
-round((total_time/calls)::numeric,2) as mean_time, self_time
+round((total_time/calls)::numeric,2) as mean_exec_time, self_time
 from pg_catalog.pg_stat_user_functions
 order by total_time desc;
 
