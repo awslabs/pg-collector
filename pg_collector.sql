@@ -4,7 +4,7 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1.1 for PostgreSQL 16                                                                        |
+-- |  -- version : V1.2 for PostgreSQL 16                                                                        |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-16/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
@@ -61,7 +61,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 16</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.2 for PostgreSQL 16</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-16" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
@@ -132,7 +132,7 @@ select * from pg_database;
 \qecho <tr>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Toast_Tables_Mapping">Toast Tables Mapping</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Replication">Replication</a></td>
-\qecho <td nowrap align="center"width="25%"><a class="link"href="#sessions_info">Sessions/Connections Info</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#sessions_info">Sessions/Connections Info</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Orphaned_prepared_transactions">Orphaned prepare transactions</a></td>
 \qecho </tr>
 \qecho <tr> 
@@ -175,6 +175,8 @@ select * from pg_database;
 \qecho <br>
 \qecho <br>
 \qecho <br>
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
 \qecho <table width="90%" border="1">
 \qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>Amazon Aurora PostgreSQL</b></font></div></th></tr>
 \qecho <tr>
@@ -202,6 +204,40 @@ select * from pg_database;
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
 \qecho </table>
+\endif
+select count(*) > 0 isauroralimitless from pg_catalog.pg_extension where extname = 'aurora_limitless_fdw' \gset
+\if :isauroralimitless
+\qecho <table width="90%" border="1">
+\qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>Amazon Aurora Limitless Database</b></font></div></th></tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Routers_Shards_Info">Routers & Shards Info</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#limitless_parameters">limitless parameters</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_Extensions">Limitless Extensions</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_databases">Limitless databases</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_Transaction_ID_TXID">Limitless Transaction ID TXID (Wraparound)</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_Tables">Limitless Tables</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#limitless_stat_statements">limitless_stat_statements</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#limitless_sessions_info">Limitless Sessions/Connections Info</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Multi_shard_queries_(MSQ)">Multi shard queries (MSQ)</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Distributed_sessions_info">Distributed sessions info</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Single_Shard_Optimized_(SSO)">Single Shard Optimized (SSO)</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_Database_Load_Wait_events">Limitless Database Load (Wait events)</a></td>
+\qecho </tr>
+\qecho </table>
+\endif
+\qecho <br>
+\qecho <br>
+\qecho <br>
 \qecho <br>
 \qecho <br>
 \qecho <br>
@@ -286,18 +322,31 @@ ORDER BY now() - a.xact_start DESC;
 
 
 
+\if :isauroralimitless
+\qecho <h3>Inactive replication slots order by age_catalog_xmin:</h3>
+select *, age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots 
+where active = false 
+order by age(catalog_xmin) desc;
+\else
 \qecho <h3>Inactive replication slots order by age_xmin:</h3>
-
 select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
 from pg_replication_slots where active = false order by age(xmin) desc;
+\endif
 
-
+\if :isauroralimitless
+\qecho <h3>Active replication slots order by age_catalog_xmin:</h3>
+select *, age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots 
+where active = true 
+order by age(catalog_xmin) desc;
+\else
 \qecho <h3>Active replication slots order by age_xmin:</h3>
-
 select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
 from pg_replication_slots 
 where active = true 
 order by age(xmin) desc;
+\endif
 
 \qecho <h3>Invalid databases count:</h3> 
 select count(*) FROM pg_database WHERE datconnlimit = '-2' ;
@@ -314,12 +363,20 @@ FROM pg_prepared_xacts
 ORDER BY age(transaction) DESC;
 
 \qecho <h3>MAX XID held:</h3>
+\if :isauroralimitless
+SELECT
+(SELECT max(age(backend_xmin)) FROM pg_stat_activity) as oldest_running_xact,
+(SELECT max(age(transaction)) FROM pg_prepared_xacts) as oldest_prepared_xact,
+--(SELECT max(age(xmin)) FROM pg_replication_slots) as oldest_replication_slot,
+(SELECT max(age(backend_xmin))FROM pg_stat_replication)as oldest_replica_xact;
+\else
 SELECT
 (SELECT max(age(backend_xmin)) FROM pg_stat_activity) as oldest_running_xact,
 (SELECT max(age(transaction)) FROM pg_prepared_xacts) as oldest_prepared_xact,
 (SELECT max(age(xmin)) FROM pg_replication_slots) as oldest_replication_slot,
 (SELECT max(age(backend_xmin))FROM pg_stat_replication)as oldest_replica_xact;
 
+\endif
 
 --\qecho <h3>XID Rate:</h3>
 
@@ -1649,11 +1706,19 @@ order by toast_size_bytes desc ;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Replication</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
+\if :isauroralimitless
+\qecho <h3> Active replication slots order by age_catalog_xmin:</h3> 
+select *, age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots 
+where active = true 
+order by age(catalog_xmin) desc;
+\else
 \qecho <h3> Active replication slots order by age_xmin:</h3> 
 select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
 from pg_replication_slots 
 where active = true 
 order by age(xmin) desc;
+\endif
 \qecho <br>
 \qecho <h3> Replication Slot Lag:</h3> 
 select slot_name,slot_type,database,active,
@@ -1662,9 +1727,15 @@ coalesce(round(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) / 1024 / 1024 
 from pg_replication_slots 
 order by Lag_MB_behind desc;
 \qecho <br>
+\if :isauroralimitless
+\qecho <h3> Inactive replication slots order by age_catalog_xmin::</h3> 
+select *,age(catalog_xmin) age_catalog_xmin 
+from pg_replication_slots where active = false order by age(catalog_xmin) desc;
+\else
 \qecho <h3> Inactive replication slots order by age_xmin::</h3> 
 select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin 
 from pg_replication_slots where active = false order by age(xmin) desc;
+\endif
 \qecho <br>
 \qecho <h3> Note:</h3>
 \qecho <h4> RDS Postgres instance storage may get full because inactive replication slots were not removed after DMS task completed </h4>
@@ -2716,12 +2787,14 @@ SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
 \qecho <a name="-----"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>*****</b></font><hr align="left" width="460">
 \qecho <br>
-\qecho <details>
+--\qecho <details>
 -- sql
-\qecho </details>
+--\qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
+----- Amazon Aurora PostgreSQL  -----
+\if :isaurora
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_version                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -2731,14 +2804,7 @@ SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora version</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT * FROM aurora_version();
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -2755,14 +2821,7 @@ SELECT * FROM aurora_version();
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora PostgreSQL built-in functions</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT * FROM aurora_list_builtins();
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2776,8 +2835,6 @@ SELECT * FROM aurora_list_builtins();
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora db instance identifier</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT server_id,
     CASE
         WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
@@ -2786,11 +2843,6 @@ SELECT server_id,
 FROM aurora_replica_status() rt,
          aurora_db_instance_identifier() di
     WHERE rt.server_id = di;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2803,19 +2855,12 @@ FROM aurora_replica_status() rt,
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora cluster instances</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
  SELECT server_id,
     CASE
         WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
         ELSE 'reader'
     END AS instance_role
 FROM aurora_replica_status() ;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2828,8 +2873,6 @@ FROM aurora_replica_status() ;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora reader instances - Replica Lag</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT server_id, 
     CASE 
         WHEN 'MASTER_SESSION_ID' = session_id THEN 'writer'
@@ -2839,11 +2882,6 @@ SELECT server_id,
     round(extract (epoch FROM (SELECT age(clock_timestamp(), last_update_timestamp))) * 1000) AS last_update_age_ms
 FROM aurora_replica_status()
 ORDER BY replica_lag_in_msec NULLS FIRST;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2858,17 +2896,10 @@ ORDER BY replica_lag_in_msec NULLS FIRST;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora cluster cache management (CCM)</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT *  FROM aurora_ccm_status();
 SELECT buffers_sent_last_minute * 8/60 AS warm_rate_kbps,
 100 * (1.0-buffers_sent_last_scan/buffers_found_last_scan) AS warm_percent 
 FROM aurora_ccm_status ();
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2883,18 +2914,15 @@ FROM aurora_ccm_status ();
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora global db status</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
-SELECT CASE 
+\if :isauroralimitless
+  \qecho 'Aurora Global Database is not supported in Amazon Aurora Limitless Database'
+  \else
+  SELECT CASE 
           WHEN '-1' = durability_lag_in_msec THEN 'Primary'
           ELSE 'Secondary'
        END AS global_role,
        *
   FROM aurora_global_db_status();
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -2914,8 +2942,6 @@ SELECT CASE
 \qecho <h4> wait_time : The total amount of time in microseconds spent waiting for this event.</h4>
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT type_name as wait_event_type,
              event_name as wait_event_name,
              waits,
@@ -2923,11 +2949,6 @@ SELECT type_name as wait_event_type,
         FROM aurora_stat_system_waits()
 NATURAL JOIN aurora_stat_wait_event()
 NATURAL JOIN aurora_stat_wait_type() order by wait_time desc;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2940,30 +2961,24 @@ NATURAL JOIN aurora_stat_wait_type() order by wait_time desc;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Query Plan Management (QPM)</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
 select count(*) > 0 is_apg_plan_mgmt_enabled FROM pg_catalog.pg_extension where extname = 'apg_plan_mgmt' \gset
 select count(*) = 0 is_apg_plan_mgmt_not_enabled FROM pg_catalog.pg_extension where extname = 'apg_plan_mgmt' \gset
-\if :isaurora
-    \if :is_apg_plan_mgmt_not_enabled
-       \qecho 'Query Plan Management (QPM) is not enabled'
-    \else
-       \if :is_apg_plan_mgmt_enabled
-        show rds.enable_plan_management ;
-        SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
-        FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
-        where e.extname = 'apg_plan_mgmt';
-        select * from pg_available_extensions where name='apg_plan_mgmt';
-        SELECT name ,version ,installed FROM pg_available_extension_versions where  name='apg_plan_mgmt' order by version;
-        select name,setting from pg_settings  where name like 'apg_plan_mgmt%';
-        with plans_stored_count as (select count(*) as cnt from apg_plan_mgmt.dba_plans)
-        select s.setting as max_plans, p.cnt as plans_stored_count, (p.cnt/s.setting::int)*100 as plans_stored_PCT_from_max_plans from pg_settings s, plans_stored_count p where s.name ='apg_plan_mgmt.max_plans';
-       \endif
-    \endif  
+\if :is_apg_plan_mgmt_not_enabled
+  \qecho 'Query Plan Management (QPM) is not enabled'
 \else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
+  \if :is_apg_plan_mgmt_enabled
+   show rds.enable_plan_management ;
+   SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
+   FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+   where e.extname = 'apg_plan_mgmt';
+   select * from pg_available_extensions where name='apg_plan_mgmt';
+   SELECT name ,version ,installed FROM pg_available_extension_versions where  name='apg_plan_mgmt' order by version;
+   select name,setting from pg_settings  where name like 'apg_plan_mgmt%';
+   with plans_stored_count as (select count(*) as cnt from apg_plan_mgmt.dba_plans)
+   select s.setting as max_plans, p.cnt as plans_stored_count, (p.cnt/s.setting::int)*100 as plans_stored_PCT_from_max_plans from pg_settings s, plans_stored_count p where s.name ='apg_plan_mgmt.max_plans';
+  \endif
 \endif
+
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -2974,8 +2989,6 @@ select count(*) = 0 is_apg_plan_mgmt_not_enabled FROM pg_catalog.pg_extension wh
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora dml activity</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora 
 with dml_details as (
 SELECT db.datname AS datname,
  NULLIF(BTRIM(SPLIT_PART(db.asdmla::TEXT, ',', 1), '()'),'') AS select_count,
@@ -3005,11 +3018,6 @@ select datname as database_name ,
           TRUNC(delete_latency_microsecs::numeric/NULLIF(delete_count::numeric,0) ,3)delete_latency_per_exec
        FROM dml_details
        order by select_count desc;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 -- +----------------------------------------------------------------------------+
@@ -3019,8 +3027,6 @@ select datname as database_name ,
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Process memory context usage</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora 
 \qecho <br>
 \qecho <h3> The allocated memory for each memory context across all the processes ordered by allocated memory: </h3>
 \qecho <br>
@@ -3070,11 +3076,6 @@ limit 50 )
 select pid ,name , allocated as allocated_size_bytes ,pg_size_pretty(allocated) as allocated_size , pg_size_pretty(used) as used_size , instances as instances_count from aurora_stat_memctx_usage() where pid in
 (select pid from memctx )
 order by PID, allocated_size_bytes desc;
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 -- +----------------------------------------------------------------------------+
@@ -3086,8 +3087,6 @@ order by PID, allocated_size_bytes desc;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora_stat_statements</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 \qecho <br>
 \qecho <h3> Top 50 SQL order by total_time: </h3>
 \qecho <br>
@@ -3171,11 +3170,6 @@ storage_blks_read
 from aurora_stat_statements() 
 order by storage_blks_read desc limit 50;
 \qecho </details>
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -3189,8 +3183,6 @@ order by storage_blks_read desc limit 50;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Aurora_stat_plans</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 \qecho <br>
 \qecho <h3> Top 50 Plan order by total_time: </h3>
 \qecho <br>
@@ -3325,11 +3317,7 @@ having count(planid) > 1
 and calls !=0
 order by queryid,dbid,  total_time_Msec desc;
 \qecho </details>
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
+
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
@@ -3342,18 +3330,1120 @@ order by queryid,dbid,  total_time_Msec desc;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Logical replication write-through cache</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
-\if :isaurora
 SELECT * FROM aurora_stat_logical_wal_cache();
-\else
-    \if yes
-        \qecho 'This is not Aurora instance'
-    \endif
-\endif
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+--------------------------------------------
+----- Amazon Aurora Limitless Database -----
+\if :isauroralimitless
+-- +----------------------------------------------------------------------------+
+-- |      - Routers_Shards_Info                       -                         |
+-- +----------------------------------------------------------------------------+
 
+
+\qecho <a name="Routers_Shards_Info"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Routers & Shards Info</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+\qecho <br>
+\qecho <h3>Which router are you connected to ?</h3>
+SELECT router_subcluster_id,
+server_id as router_instance_identifier , 
+CASE WHEN 'MASTER_SESSION_ID' = session_id 
+THEN 'writer' ELSE 'reader' END AS instance_role ,
+Availability_Zone 
+FROM aurora_replica_status() rt, aurora_db_instance_identifier() di , rds_aurora.limitless_subcluster_id() router_subcluster_id , rds_aurora.limitless_instance_az() as Availability_Zone 
+WHERE rt.server_id = di;
+\qecho <br>
+\qecho <h3>Routers endpoints:</h3>
+select * from aurora_limitless_router_endpoints()  ;
+
+\qecho <br>
+\qecho <h3>Routers & Shards ID:</h3>
+select * from rds_aurora.limitless_subclusters() order by 1 ;
+\qecho <br>
+\qecho <h3>Routers & Shards counts</h3>
+select subcluster_type , count (*) from rds_aurora.limitless_subclusters()
+group by  subcluster_type 
+order by 2 desc ;
+\qecho <br>
+\qecho <h3>Routers & Shards Statistics</h3>
+select * from  rds_aurora.limitless_stat_subclusters;
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - limitless_parameters                      -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="limitless_parameters"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless parameters</b></font><hr align="left" width="460">
+\qecho <br>
+
+\qecho <details>
+\qecho <br>
+select *  from pg_settings where name like '%limitless%'  order by name;
+\qecho <br>
+SELECT *  FROM pg_settings where name in ('max_worker_processes','max_prepared_transactions','enable_partitionwise_aggregate','venable_partitionwise_join','default_transaction_isolation') order by category;
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Limitless_databases                       -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Limitless_databases"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Databases</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+\qecho <br>
+\qecho <h3>Limitless Databases:  </h3>
+select * FROM rds_aurora.limitless_database order by datname , subcluster_id;
+
+\qecho <br>
+\qecho <h3>The total size for all limitless databases accross all Routers and Shards:  </h3>
+-- Total_limitless_Databases_Size 
+with dbs_details as (
+select 
+datname as database_name ,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 1), '()') AS subcluster_id,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 2), '()') AS subcluster_type,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 3), '()') AS db_size_bytes
+from (SELECT distinct datname, rds_aurora.limitless_stat_database_size(ld.datname) AS lsds FROM rds_aurora.limitless_database as ld ) dbs 
+order by database_name)
+select pg_size_pretty(sum(db_size_bytes::numeric)) AS Total_limitless_Databases_Size 
+FROM dbs_details ;
+
+
+\qecho <br>
+\qecho <h3>The total size for each limitless database accross all Routers and Shards:  </h3>
+-- per DB
+with dbs_details as (
+select 
+datname as database_name ,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 1), '()') AS subcluster_id,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 2), '()') AS subcluster_type,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 3), '()') AS db_size_bytes
+from (SELECT distinct datname, rds_aurora.limitless_stat_database_size(ld.datname) AS lsds FROM rds_aurora.limitless_database as ld ) dbs 
+order by database_name)
+select database_name ,pg_size_pretty(sum(db_size_bytes::numeric)) AS Total_Database_Size 
+FROM dbs_details 
+group by database_name
+order by 2 desc;
+
+\qecho <br>
+\qecho <h3>The limitless databases size in each Router and Shard:  </h3>
+
+-- per DB per subcluster 
+with dbs_details as (
+select 
+datname as database_name ,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 1), '()') AS subcluster_id,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 2), '()') AS subcluster_type,
+BTRIM(SPLIT_PART(lsds::TEXT, ',', 3), '()') AS db_size_bytes
+from (SELECT distinct datname, rds_aurora.limitless_stat_database_size(ld.datname) AS lsds FROM rds_aurora.limitless_database as ld ) dbs 
+order by database_name)
+select * ,pg_size_pretty(db_size_bytes::numeric) as db_size
+FROM dbs_details 
+order by database_name;
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Limitless_Extensions                      -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Limitless_Extensions"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Extensions</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+\qecho <br>
+\qecho <h3>shared_preload_libraries parameter: </h3>
+show shared_preload_libraries;
+\qecho <br>
+\qecho <h3>Installed extension :  </h3>
+SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner,  c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
+FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+ORDER BY 1;
+\qecho <br>
+\qecho <h3>limitless supported extensions :  </h3>
+SHOW rds_aurora.limitless_supported_extensions;
+\qecho <h3>Available extensions: </h3>
+\qecho <br>
+\qecho <h4> pg_available_extension_versions : </h4>
+select * from pg_available_extension_versions order by name,version;
+\qecho <br>
+\qecho <h4> pg_available_extensions : </h4>
+select * from pg_available_extensions order by installed_version;
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Limitless_Transaction_ID_TXID                       -               |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Limitless_Transaction_ID_TXID"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Transaction ID TXID (Wraparound)</b></font><hr align="left" width="460">
+\qecho <br> 
+\qecho <details>
+\qecho <br>
+\qecho <h3>Oldest xid accross all Routers and Shards:</h3>
+SELECT 
+max(age(datfrozenxid)) oldest_xid_age 
+FROM 
+rds_aurora.limitless_database ;
+
+\qecho <br>
+\qecho <h3>Oldest xid for each Router and Shard:  </h3>
+SELECT 
+subcluster_id ,subcluster_type, max(age(datfrozenxid)) oldest_xid_age
+FROM 
+rds_aurora.limitless_database
+group by 1,2 
+order by 3 desc;
+
+\qecho <br>
+\qecho <h3>Oldest xid for each limitless database in all Routers and Shards:</h3>
+SELECT 
+subcluster_id,subcluster_type,datname database_name ,age(datfrozenxid) oldest_xid_age
+FROM
+ rds_aurora.limitless_database order by 4 desc ;
+
+
+\qecho <h3>Orphaned prepared transactions:</h3>
+
+SELECT * from rds_aurora.limitless_stat_prepared_xacts ORDER BY age(transaction_id) DESC;
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Limitless_Tables                          -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Limitless_Tables"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Tables</b></font><hr align="left" width="460">
+\qecho <br> 
+\qecho <details>
+\qecho <br>
+\qecho <h3>Tables list :  </h3>
+select * from rds_aurora.limitless_tables;
+\qecho <br>
+\qecho <h3>Collocated sharded tables info:  </h3>
+SELECT * FROM rds_aurora.limitless_table_collocations order by collocation_id;
+\qecho <br>
+\qecho <h3>Tables size accross all Routers and Shards:  </h3>
+with lt_details as (
+select 
+table_name ,schema_name,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 1), '()') AS subcluster_id,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 2), '()') AS subcluster_type,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 8), '()') AS table_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 9), '()') AS indexes_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 7), '()') AS toast_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 10), '()') AS total_size_bytes
+from (SELECT  schema_name,table_name, rds_aurora.limitless_stat_relation_sizes(lt.schema_name,lt.table_name) AS lsrs FROM rds_aurora.limitless_tables as lt) lts )
+select table_name ,schema_name , pg_size_pretty(sum(table_size_bytes::numeric)) as table_size , pg_size_pretty(sum(indexes_size_bytes::numeric)) as indexes_size , pg_size_pretty(sum(toast_size_bytes::numeric)) as toast_size, pg_size_pretty(sum(total_size_bytes::numeric)) as total_size , sum(total_size_bytes::numeric) as total_size_bytes
+FROM lt_details 
+group by table_name,schema_name
+order by total_size_bytes desc ;
+\qecho <br>
+\qecho <h3>Tables size in each Router and Shard:  </h3>
+\qecho <br>
+\qecho <h4> the size of the reference tables is consistent across all the shards in the DB shard group</h4>
+with lt_details as (
+select 
+table_name ,schema_name,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 1), '()') AS subcluster_id,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 2), '()') AS subcluster_type,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 8), '()') AS table_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 9), '()') AS indexes_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 7), '()') AS toast_size_bytes,
+BTRIM(SPLIT_PART(lsrs::TEXT, ',', 10), '()') AS total_size_bytes
+from (SELECT  schema_name,table_name, rds_aurora.limitless_stat_relation_sizes(lt.schema_name,lt.table_name) AS lsrs FROM rds_aurora.limitless_tables as lt) lts )
+select table_name ,schema_name, subcluster_id , subcluster_type , pg_size_pretty(table_size_bytes::numeric) as table_size , pg_size_pretty(indexes_size_bytes::numeric) as indexes_size , pg_size_pretty(toast_size_bytes::numeric) as toast_size, pg_size_pretty(total_size_bytes::numeric) as total_size
+FROM lt_details order by table_name,schema_name;
+
+\qecho <br>
+\qecho <h3>Indexes:  </h3>
+\qecho <br>
+SELECT * FROM pg_catalog.pg_indexes WHERE tablename in (SELECT table_name from rds_aurora.limitless_tables) order by tablename ;
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - limitless_stat_statements                 -                         |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="limitless_stat_statements"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>limitless_stat_statements</b></font><hr align="left" width="460">
+\qecho <br>
+select count(*) > 0 is_pg_stat_statements_enabled FROM pg_catalog.pg_extension where extname = 'pg_stat_statements' \gset
+\if :is_pg_stat_statements_enabled
+\qecho <details>
+\qecho <br>
+\qecho <h3> pg_stat_statements installed version: </h3>
+\qecho <br>
+SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
+FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+where e.extname = 'pg_stat_statements';
+\qecho <br>
+\qecho <h3>pg_stat_statements parameters values: </h3>
+-- pg_stat_statements extension configuration 
+select name as parameter_name, setting  from pg_settings where name in ('pg_stat_statements.track','pg_stat_statements.track_utility','pg_stat_statements.save'
+,'pg_stat_statements.max','shared_preload_libraries');
+\qecho <br>    
+\qecho <h3> limitless_stat_statements_info view: </h3>       
+\qecho <h4> The statistics of the pg_stat_statements module itself are tracked and made available via a view named limitless_stat_statements_info for all Routers and Shards </h4>
+\qecho <h4> dealloc column show the Total number of times pg_stat_statements entries about the least-executed statements were deallocated because more distinct statements than pg_stat_statements.max were observed </h4> 
+select * from rds_aurora.limitless_stat_statements_info order by 3 desc;
+\qecho <br>
+\qecho <h3>Top 50 SQL order by total_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+order by total_time_Msec desc limit 50;
+\qecho <br>
+\qecho <h3> Top 50 SQL order by avg_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+order by avg_time_Msec desc limit 50;
+\qecho <br>
+\qecho <h3>Top 50 SQL order by percent of total DB time percent:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+order by percent desc limit 50;
+
+\qecho <br>
+\qecho <h3>Top 50 SQL order by number of execution (CALLs):</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+order by calls desc limit 50;
+
+\qecho <br>
+\qecho <h3>Top 50 SQL order by shared blocks read (physical reads) from Aurora storage:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid, substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
+shared_blks_read
+storage_blks_read
+from rds_aurora.limitless_stat_statements
+order by storage_blks_read desc limit 50;
+\qecho </details>
+\else
+    \if yes
+        \qecho 'pg_stat_statements extension is not installed'
+    \endif
+\endif
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Multi_shard_queries_(MSQ)                 -                         |
+-- +----------------------------------------------------------------------------+
+\qecho <br>
+\qecho <a name="Multi_shard_queries_(MSQ)"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Multi shard queries (MSQ)</b></font><hr align="left" width="460">
+\qecho <br>
+select count(*) > 0 is_pg_stat_statements_enabled FROM pg_catalog.pg_extension where extname = 'pg_stat_statements' \gset
+\if :is_pg_stat_statements_enabled
+\qecho <details>
+\qecho <br>
+\qecho <h4>Note : This section is listing both Multi-shard query (MSQ) and Single-shard query (SSQ) that is not Single-shard optimization (SSO)</h4>
+\qecho <br>
+\qecho <h3>Top 50 multi shard queries (MSQ) order by total_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+where sso_calls = 0 
+and subcluster_type ='router'
+order by total_time_Msec desc limit 50;
+\qecho <br>
+\qecho <h3>Top 50 multi shard queries (MSQ) order by avg_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+where sso_calls = 0 
+and subcluster_type ='router'
+order by avg_time_Msec desc limit 50;
+
+\qecho <br>
+\qecho <h3>Top 50 multi shard queries (MSQ) order by percent of total DB time percent:</h3>
+\qecho <br>
+
+
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+where sso_calls = 0 
+and subcluster_type ='router'
+order by percent desc limit 50;
+\qecho <br>
+\qecho <h3>Top 50 multi shard queries (MSQ) order by number of execution (CALLs):</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+where sso_calls = 0 
+and subcluster_type ='router'
+order by calls desc limit 50;
+\qecho <br>
+\qecho <h3>Top 50 multi shard queries (MSQ) order by shared blocks read (physical reads) from Aurora storage:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid, substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
+shared_blks_read
+storage_blks_read
+from rds_aurora.limitless_stat_statements
+where sso_calls = 0 
+and subcluster_type ='router'
+order by storage_blks_read desc limit 50;
+\qecho </details>
+\else
+    \if yes
+        \qecho 'pg_stat_statements extension is not installed'
+    \endif
+\endif
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+
+-- +----------------------------------------------------------------------------+
+-- |      - Single_Shard_Optimized (SSO)                -                       |
+-- +----------------------------------------------------------------------------+
+
+\qecho <br>
+\qecho <a name="Single_Shard_Optimized_(SSO)"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Single Shard Optimized (SSO)</b></font><hr align="left" width="460">
+\qecho <br>
+select count(*) > 0 is_pg_stat_statements_enabled FROM pg_catalog.pg_extension where extname = 'pg_stat_statements' \gset
+\if :is_pg_stat_statements_enabled
+\qecho <details>
+\qecho <br>
+\qecho <h3>Single Shard Optimized (SSO) Percentage:</h3>
+\qecho <br>
+select sum(calls) as count_calls, sum (sso_calls) as count_sso_calls ,trunc ((sum (sso_calls) /sum(calls) ) * 100 ,2)as "sso_calls_%" from rds_aurora.limitless_stat_statements where subcluster_type ='router' ;
+\qecho <br>
+\qecho <h3>Top 50 single shard queries (SSQ) order by total_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+where sso_calls > 0 
+and subcluster_type ='router'
+order by total_time_Msec desc limit 50;
+
+\qecho <br>
+\qecho <h3>Top 50 Single Shard Optimized (SSO) order by avg_time:</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+where sso_calls > 0 
+and subcluster_type ='router'
+order by avg_time_Msec desc limit 50;
+
+
+\qecho <br>
+\qecho <h3>Top 50 Single Shard Optimized (SSO) order by percent of total DB time percent:</h3>
+\qecho <br>
+
+
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls, 
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements 
+where sso_calls > 0 
+and subcluster_type ='router'
+order by percent desc limit 50;
+
+\qecho <br>
+\qecho <h3>Top 50 Single Shard Optimized (SSO) order by number of execution (CALLs):</h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid,substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
+from rds_aurora.limitless_stat_statements
+where sso_calls > 0 
+and subcluster_type ='router'
+order by calls desc limit 50;
+
+\qecho <br>
+\qecho <h3> Top 50 Single Shard Optimized (SSO) order by shared blocks read (physical reads) from Aurora storage: </h3>
+\qecho <br>
+select subcluster_id,subcluster_type,queryid,sso_calls,trunc ((sso_calls/calls) * 100 ,2) as "sso_calls_%",distributedqueryid, substring(query,1,60) as query , calls,
+round(total_exec_time::numeric, 2) as total_time_Msec, 
+round((total_exec_time::numeric/1000), 2) as total_time_sec,
+round(mean_exec_time::numeric,2) as avg_time_Msec,
+round((mean_exec_time::numeric/1000),2) as avg_time_sec,
+round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
+shared_blks_read
+storage_blks_read
+from rds_aurora.limitless_stat_statements
+where sso_calls > 0 
+and subcluster_type ='router'
+order by storage_blks_read desc limit 50;
+\qecho </details>
+\else
+    \if yes
+        \qecho 'pg_stat_statements extension is not installed'
+    \endif
+\endif
+
+
+\qecho </details>
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+-- +----------------------------------------------------------------------------+
+-- |      - limitless_sessions_info                                           - |
+-- +----------------------------------------------------------------------------+
+
+\qecho <a name="limitless_sessions_info"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Sessions/Connections Info</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3>Routers & Shards connections utilization:</h3>
+\qecho <br>
+\qecho <details>
+with
+settings as (SELECT setting::float AS "max_connections" FROM pg_settings WHERE name = 'max_connections'),
+connections as ( select subcluster_id, subcluster_type  ,sum (numbackends)::float total_connections 
+from rds_aurora.limitless_stat_database
+group by 1,2 )
+select subcluster_id, subcluster_type,total_connections ,settings.max_connections, ROUND((100*(connections.Total_connections/settings.max_connections))::numeric,2) as "Connections utilization %" from  settings, connections
+order by 5 desc;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Reserved connections settings:</h3>
+\qecho <br>
+\qecho <details>
+select  name as parameter_name , setting , short_desc from pg_settings WHERE name in ('superuser_reserved_connections', 'reserved_connections');
+\qecho </details>
+\qecho <br>
+\qecho <h3>Sessions statistics:</h3>
+\qecho <br>
+\qecho <details>
+select 
+subcluster_id,subcluster_type
+,trunc((sum(session_time) / (60*60*1000))::numeric,2) as session_time_hours
+,trunc((sum(active_time) / (60*60*1000))::numeric,2) as session_active_time_hours
+,trunc((sum(idle_in_transaction_time) / (60*60*1000))::numeric,2) as session_idle_in_transaction_time_hours
+,sum(sessions) as  sessions_established_count
+,sum(sessions_abandoned) as sessions_abandoned_count
+,sum(sessions_fatal) as sessions_fatal_count
+,sum(sessions_killed) as sessions_killed_count
+from rds_aurora.limitless_stat_database 
+where datname is not null 
+group by subcluster_id,subcluster_type order by 2;
+\qecho <br>
+select 
+subcluster_id,subcluster_type,datname as Database_name
+,trunc((session_time / (60*60*1000))::numeric,2) as session_time_hours
+,trunc((active_time / (60*60*1000))::numeric,2) as session_active_time_hours
+,trunc((idle_in_transaction_time / (60*60*1000))::numeric,2) as session_idle_in_transaction_time_hours
+,sessions as  sessions_established_count
+,sessions_abandoned as sessions_abandoned_count
+,sessions_fatal as sessions_fatal_count
+,sessions_killed as sessions_killed_count
+from rds_aurora.limitless_stat_database 
+where datname not in ('rdsadmin','template1','rdsadmin_limitless','template0')
+order by subcluster_id,subcluster_type ;
+\qecho </details>
+\qecho <br>
+\qecho <h3> DB/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+
+
+SELECT datname as "Database_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1
+order by 2 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3
+order by 4 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3
+order by 4 desc ;
+
+
+
+\qecho </details>
+\qecho <br>
+\qecho <h3> DB/username/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+SELECT datname as "Database_Name",usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1,2
+order by 3 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name",usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3,4
+order by 5 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name",usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3,4
+order by 5 desc ;
+
+
+
+\qecho </details>
+\qecho <br>
+\qecho <h3> username/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+SELECT usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1
+order by 2 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3
+order by 4 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,usename as "User_Name" ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3
+order by 4 desc ;
+
+
+
+\qecho </details>
+\qecho <br>
+\qecho <h3> username/status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+SELECT usename as "User_Name" ,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1,2
+order by 3 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,usename as "User_Name" ,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3,4
+order by 5 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,usename as "User_Name",state as status ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3,4
+order by 5 desc ;
+
+
+
+\qecho </details>
+\qecho <br>
+\qecho <h3> DB/username/status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+SELECT datname as "Database_Name",usename as "User_Name" ,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1,2,3
+order by 4 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name",usename as "User_Name" ,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3,4,5
+order by 6 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,datname as "Database_Name",usename as "User_Name",state as status ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3,4,5
+order by 6 desc ;
+\qecho </details>
+\qecho <br>
+\qecho <h3> status/Connections count :</h3>
+\qecho <br>
+\qecho <details>
+SELECT state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1
+order by 2 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3
+order by 4 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,state as status ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3
+order by 4 desc ;
+\qecho </details>
+\qecho <br>
+\qecho <h3> SQL/status/Connections count : </h3>
+\qecho <br>
+\qecho <details>
+SELECT query,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+group by 1,2
+order by 3 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,query,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router'
+group by 1,2,3,4
+order by 5 desc ;
+
+\qecho <br>
+SELECT subcluster_id, subcluster_type, query,state as status,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard'
+group by 1,2,3,4
+order by 5 desc ;
+
+\qecho </details>
+\qecho <br>
+\qecho <h3> query_id & distributed_query_id/status/Connections count : </h3>
+\qecho <br>
+\qecho <details>
+SELECT query_id,state as status , count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null and query_id is not null
+group by 1,2
+order by 3 desc ;
+\qecho <br>
+SELECT  distributed_query_id,state as status , count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null and distributed_query_id is not null
+group by 1,2
+order by 3 desc ;
+\qecho <br>
+SELECT subcluster_id, subcluster_type ,query_id, state as status , count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null and  query_id is not null
+and subcluster_type ='router'
+group by 1,2,3,4
+order by 5 desc ;
+\qecho <br>
+SELECT subcluster_id, subcluster_type , distributed_query_id, state as status ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='router' and distributed_query_id is not null
+group by 1,2,3,4
+order by 5 desc ;
+\qecho <br>
+SELECT subcluster_id, subcluster_type , query_id , state as status  ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null and  query_id is not null
+and subcluster_type ='shard'
+group by 1,2,3,4
+order by 5 desc ;
+\qecho <br>
+SELECT subcluster_id, subcluster_type  , distributed_query_id, state as status  ,count(*) as "Connections_count"
+FROM rds_aurora.limitless_stat_activity 
+where datname is not null 
+and subcluster_type ='shard' and distributed_query_id is not null
+group by 1,2,3,4
+order by 5 desc ;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Active sessions:</h3>
+\qecho <br>
+\qecho <details>
+/* active_session_monitor*/ select
+subcluster_id,subcluster_type,distributed_session_id,pid ,distributed_query_id,query_id,usename,datname as DB_name, 
+coalesce(wait_event,'CPU') as wait_event,state,is_sso_query,distributed_session_state, 
+substr(query, 1, 50)||' ... '||right(query, 50) as query, 
+now()-state_change  as state_change_duration , now()-xact_start as xact_duration 
+from rds_aurora.limitless_stat_activity 
+where state != 'idle' and subcluster_type='router'  and query not like '%active_session_monitor%' order by state_change_duration desc;
+\qecho </details>
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Distributed_sessions_info                                         - |
+-- +----------------------------------------------------------------------------+
+
+\qecho <a name="Distributed_sessions_info"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Distributed sessions info</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h4>Distributed session is a session started on the router and executing a query on or more shard (and in some cases the other routers ) and this case the query will be called Distributed query .</h4>
+\qecho <h4>Single-shard query (SSQ): a query where all of the data needed for the query is on one shard, if the entire operation can be performed on one shard, including any result set generated. the planner will send the entire SQL query to the corresponding shard and query planning is skipped on the router layer and completely pushed down to the shard for planning and execution This optimization will reduce the number of network round trips from the router to the shard, improving the performance and this case the query will be called Single Shard Optimized (SSO) .  not all single-shard queries (SSQ) are Single Shard Optimized (SSO). Please review the restrictions for SSO listed below.</h4>
+\qecho <h4>Multi-shard query (MSQ) : a query is a query where the data needed for the query is on more than one shard </h4>
+\qecho <h4>When a session starts on the router, the distributed session state will be null, as indicated by the distributed_session_state column in the rds_aurora.limitless_stat_activity view being NULL. </h4>
+\qecho <h4>The distributed session state will be set to "coordinator" once the router session executes a query that needs to run on one or more shards or routers. The sessions that run on the other shards or routers will be called "participant" sessions.</h4>
+\qecho <h4>The distributed_query_id for the participant sessions will be the same as the SQL ID of the coordinator session if the session status is active .</h4>
+\qecho <br>
+\qecho <h3>How many participant sessions for each Coordinator session:</h3>
+\qecho <br>
+\qecho <details>
+with router as 
+(
+Select
+distributed_session_id,distributed_session_state,subcluster_type
+from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and subcluster_type ='router' and distributed_session_state ='coordinator'
+)
+,
+shard as 
+(
+Select
+distributed_session_id,distributed_session_state,subcluster_type, distributed_query_id  ,
+count(*) as participant_count
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_session_state is not null and subcluster_type ='shard'
+ group by 1,2,3,4
+)
+select 
+router.distributed_session_id ,router.distributed_session_state ,router.subcluster_type , shard.participant_count
+from router
+left OUTER JOIN shard on router.distributed_session_id=shard.distributed_session_id 
+order by shard.participant_count desc;
+\qecho </details>
+
+\qecho <br>
+\qecho <h3>Active distributed sessions  ordered by state change duration (coordinator sessions only):</h3>
+\qecho <br>
+\qecho <details>
+Select
+distributed_session_id,distributed_session_state,subcluster_id,subcluster_type,pid,state,is_sso_query,
+CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event" ,
+query_id , distributed_query_id ,substr(query, 1, 50) query,usename,datname as DB_name, 
+now()-state_change  as state_change_duration , now()-xact_start as xact_duration  
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_session_state ='coordinator' and subcluster_type='router'
+order by state_change_duration desc; 
+\qecho </details>
+
+\qecho <br>
+\qecho <h3>Active distributed sessions that are executing Single Shard Optimized Query (SSO) ordered by state change duration (coordinator sessions only):</h3>
+\qecho <br>
+\qecho <details>
+Select
+distributed_session_id,distributed_session_state,subcluster_id,subcluster_type,pid,state,is_sso_query,
+CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event" ,
+query_id , distributed_query_id ,substr(query, 1, 50) query, usename,datname as DB_name, 
+now()-state_change  as state_change_duration , now()-xact_start as xact_duration 
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_session_state is not null  and is_sso_query is true
+order by state_change_duration desc; 
+\qecho </details>
+
+
+\qecho <br>
+\qecho <h3>Active distributed sessions that are executing Multi Shard Query (MSQ) ordered by state change duration (coordinator sessions only) :</h3>
+\qecho <br>
+\qecho <details>
+Select
+distributed_session_id,distributed_session_state,subcluster_id,subcluster_type,pid,state,is_sso_query,
+CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event" ,
+query_id , distributed_query_id ,substr(query, 1, 50) query, usename,datname as DB_name, 
+now()-state_change  as state_change_duration , now()-xact_start as xact_duration 
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_session_state is not null  and is_sso_query is false
+order by state_change_duration desc; 
+\qecho </details>
+
+
+\qecho <br>
+\qecho <h3>Active distributed sessions (coordinator sessions and Their Participant Sessions on Shards/routers ):</h3>
+\qecho <br>
+\qecho <details>
+Select
+distributed_session_id,distributed_session_state,subcluster_id,subcluster_type,pid,state,is_sso_query,
+CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event" ,
+query_id , distributed_query_id ,substr(query, 1, 50) query, usename,datname as DB_name, 
+now()-state_change  as state_change_duration , now()-xact_start as xact_duration 
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_session_state is not null 
+order by 1,2 ;
+\qecho </details>
+
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Limitless_Database_Load_Wait_events                               - |
+-- +----------------------------------------------------------------------------+
+
+\qecho <a name="Limitless_Database_Load_Wait_events"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Limitless Database Load (Wait events)</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3>Wait events / Active sessions count across all routers and shards:</h3>
+\qecho <br>
+\qecho <details>
+
+--- wait events / active sessions count ---
+-- wait events / active sessions count across all routers and shards --
+
+Select CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event", count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' 
+ group by 1
+ order by 2 desc;
+\qecho </details>
+\qecho <br>
+
+ 
+\qecho <h3>Wait events / Active sessions count across all routers only :</h3>
+\qecho <br>
+\qecho <details>
+-- wait events / active sessions count across all routers only --
+ Select CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event", count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and subcluster_type='router'
+ group by 1
+ order by 2 desc;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Wait events / Active sessions count across all shards only:</h3>
+\qecho <br>
+\qecho <details>
+-- wait events / active sessions count across all shards only --
+ Select CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event", count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and subcluster_type='shard'
+ group by 1
+ order by 2 desc;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Wait events / Active sessions count per router:</h3>
+\qecho <br>
+\qecho <details>
+-- wait events / active sessions count per router --
+ Select subcluster_id,subcluster_type,CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event", count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and subcluster_type='router'
+ group by 1,2,3
+ order by 4 desc;
+
+\qecho </details>
+\qecho <br>
+
+
+\qecho <h3>Wait events / Active sessions count per shard:</h3>
+\qecho <br>
+\qecho <details>
+-- wait events / active sessions count per shard --
+ Select subcluster_id,subcluster_type,CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event", count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and subcluster_type='shard'
+ group by 1,2,3
+ order by 4 desc;
+
+\qecho </details>
+\qecho <br>
+
+\qecho <h3>Wait events / Distributed query id / Active sessions count :</h3>
+\qecho <br>
+\qecho <details>
+--- wait events / distributed_query_id / active sessions count ---
+-- wait events / distributed_query_id / active sessions count across all routers and shards --
+Select
+CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event",
+distributed_query_id ,
+count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_query_id is not null
+ group by 1,2
+ order by 3 desc;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Wait events / Distributed query id / Active sessions count per router and shard:</h3>
+\qecho <br>
+\qecho <details>
+-- wait events / distributed_query_id / active sessions count per router and shard --
+Select
+subcluster_id,
+subcluster_type,CONCAT_WS (':',wait_event_type,coalesce(wait_event,'CPU')) AS "wait_event",
+distributed_query_id ,
+count(*)
+ from  rds_aurora.limitless_stat_activity
+ where state != 'idle' and distributed_query_id is not null
+ group by 1,2,3,4
+ order by 1,5 desc;
+\qecho </details>
+\qecho <br>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+--------------------------------------------
 \echo Report Generated Successfully
 \echo Report name and location: /tmp/pg_collector_:filename.html
 \q

@@ -20,3 +20,12 @@ All notable changes to pg collector will be documented in this file.
 4- Implement a check for the pg_stat_statements extension. If the extension is not installed, the script should print the message "pg_stat_statements extension is not installed" in the report, instead of displaying the errors "ERROR: relation "pg_stat_statements_info" does not exist" or "ERROR: relation "pg_stat_statements" does not exist".
 5- Add a new section "List of role grants" under "Users & Roles Info".
 ```
+
+
+#  V1.2
+
+```
+1- Add a new section for Amazon Aurora Limitless Database.
+2- Starting from this version, the pg collector will not include Amazon Aurora PostgreSQL or Amazon Aurora Limitless Database sections automatically in the pg collector report if the instance is not an Amazon Aurora.
+
+```
