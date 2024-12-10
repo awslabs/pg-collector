@@ -4,8 +4,8 @@
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
 -- |                   and generate HTML Report                                                                  |
--- |  -- version : V1.2 for PostgreSQL 16                                                                        |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-16/CHANGELOG.md    | 
+-- |  -- version : V1 for PostgreSQL 17                                                                          |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-17/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -61,8 +61,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.2 for PostgreSQL 16</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-16" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 17</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-17" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -313,9 +313,11 @@ SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'||
   round(100.0 * p.heap_blks_scanned / p.heap_blks_total, 1) AS scanned_pct, 
   round(100.0 * p.heap_blks_vacuumed / p.heap_blks_total, 1) AS vacuumed_pct, 
   p.index_vacuum_count,
-  p.max_dead_tuples as max_dead_tuples_per_cycle,
+  p.max_dead_tuple_bytes as dead_tuple_data_per_cycle,
   s.n_dead_tup as total_num_dead_tuples ,
-  ceil(s.n_dead_tup::float/p.max_dead_tuples::float) index_cycles_required
+  indexes_total as total_indexes_to_vacuum,
+  indexes_processed as total_indexes_processed,
+  ceil(p.dead_tuple_bytes::float/p.max_dead_tuple_bytes::float) index_cycles_required
 FROM pg_stat_progress_vacuum p JOIN pg_stat_activity a using (pid) 
      join pg_stat_all_tables s on s.relid = p.relid
 ORDER BY now() - a.xact_start DESC;
@@ -619,7 +621,24 @@ now() - pg_stat_activity.query_start AS duration,
 \qecho <h3>Vacuum progress:</h3>
 \qecho <br>
 \qecho <details>
-SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'|| wait_event, 'f') AS waiting, CASE WHEN a.query ~ '^autovacuum.*to prevent wraparound' THEN 'wraparound' WHEN a.query ~ '^vacuum' THEN 'user' ELSE 'regular' END AS mode, p.datname AS database, p.relid::regclass AS table, p.phase, pg_size_pretty(p.heap_blks_total * current_setting('block_size')::int) AS table_size, pg_size_pretty(pg_total_relation_size(relid)) AS total_size, pg_size_pretty(p.heap_blks_scanned * current_setting('block_size')::int) AS scanned, pg_size_pretty(p.heap_blks_vacuumed * current_setting('block_size')::int) AS vacuumed, round(100.0 * p.heap_blks_scanned / p.heap_blks_total, 1) AS scanned_pct, round(100.0 * p.heap_blks_vacuumed / p.heap_blks_total, 1) AS vacuumed_pct, p.index_vacuum_count, round(100.0 * p.num_dead_tuples / p.max_dead_tuples,1) AS dead_pct FROM pg_stat_progress_vacuum p JOIN pg_stat_activity a using (pid) ORDER BY now() - a.xact_start DESC;
+SELECT p.pid, now() - a.xact_start AS duration, coalesce(wait_event_type ||'.'|| wait_event, 'f') AS waiting, 
+  CASE WHEN a.query ~ '^autovacuum.*to prevent wraparound' THEN 'wraparound' WHEN a.query ~ '^vacuum' THEN 'user' ELSE 'regular' END AS mode, 
+  p.datname AS database, p.relid::regclass AS table, p.phase, a.query ,
+  pg_size_pretty(p.heap_blks_total * current_setting('block_size')::int) AS table_size, 
+  pg_size_pretty(pg_total_relation_size(p.relid)) AS total_size, 
+  pg_size_pretty(p.heap_blks_scanned * current_setting('block_size')::int) AS scanned, 
+  pg_size_pretty(p.heap_blks_vacuumed * current_setting('block_size')::int) AS vacuumed, 
+  round(100.0 * p.heap_blks_scanned / p.heap_blks_total, 1) AS scanned_pct, 
+  round(100.0 * p.heap_blks_vacuumed / p.heap_blks_total, 1) AS vacuumed_pct, 
+  p.index_vacuum_count,
+  p.max_dead_tuple_bytes as dead_tuple_data_per_cycle,
+  s.n_dead_tup as total_num_dead_tuples ,
+  indexes_total as total_indexes_to_vacuum,
+  indexes_processed as total_indexes_processed,
+  ceil(p.dead_tuple_bytes::float/p.max_dead_tuple_bytes::float) index_cycles_required
+FROM pg_stat_progress_vacuum p JOIN pg_stat_activity a using (pid) 
+     join pg_stat_all_tables s on s.relid = p.relid
+ORDER BY now() - a.xact_start DESC;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Autovacuum progress per day: </h3>
@@ -1011,6 +1030,8 @@ round(stddev_exec_time::numeric, 2) as standard_deviation_time_Msec,
 round((stddev_exec_time::numeric/1000), 2) as standard_deviation_time_sec, 
 round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
+round((shared_blk_read_time::numeric/1000),2) as shared_blocks_read_time_sec,
+shared_blks_hit as shared_blocks_hits,
 shared_blks_read
 from pg_stat_statements 
 order by shared_blks_read desc limit 20;

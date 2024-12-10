@@ -6,26 +6,11 @@ All notable changes to pg collector will be documented in this file.
 #  V1
 
 ```
-1- V1 version Created from pg-collector-for-postgresQL-15 branch. 
-2- Change the supported postgresql version from 15 to 16.
-3- Add reserved_connections parameter to Reserved connections settings.
-```
-
-#  V1.1
-
-```
-1- The script should display the message "Report Generated Successfully" upon successful completion and relocate the report file name and location information to the end of the script..
-2- Add a new section for Amazon Aurora PostgreSQL.
-3- Add a new section for Invalid databases.
-4- Implement a check for the pg_stat_statements extension. If the extension is not installed, the script should print the message "pg_stat_statements extension is not installed" in the report, instead of displaying the errors "ERROR: relation "pg_stat_statements_info" does not exist" or "ERROR: relation "pg_stat_statements" does not exist".
-5- Add a new section "List of role grants" under "Users & Roles Info".
-```
-
-
-#  V1.2
-
-```
-1- Add a new section for Amazon Aurora Limitless Database.
-2- Starting from this version, the pg collector will not include Amazon Aurora PostgreSQL or Amazon Aurora Limitless Database sections automatically in the pg collector report if the instance is not an Amazon Aurora.
-
+1- V1 version created from pg-collector-for-postgresQL-16 branch. 
+2- Change the supported postgresql version from 16 to 17
+3- Fix "ERROR:  column p.max_dead_tuples does not exist" and "ERROR:  column p.num_dead_tuples does not exist" by changing the columns "max_dead_tuples" and "num_dead_tuples" to the newly introduced columns  "max_dead_tuple_bytes" and "dead_tuple_bytes" : https://git.postgresql.org/gitweb/?p=postgresql.git;a=commit;h=667e65aac354975c6f8090c6146fceb8d7b762d6
+4- Added new columns "total_indexes_to_vacuum" and "total_indexes_processed" to "vacuum progress process" table.
+5- Added new columns  to "Top SQL order by shared blocks read (physical reads)" table 
+	"shared_blocks_hits"
+	"shared_blocks_read_time_sec"
 ```
