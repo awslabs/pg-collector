@@ -26,6 +26,40 @@ With PG Collector an operator gains insights on various aspects of the database,
 
 and more, please check the example reports 
 
+## PG Collector's Automated Database Health check
+
+The Observations section has been implemented as an automated database health assessment system designed to identify potential database issues and provide actionable recommendations .
+
+The observations section seamlessly integrates with existing PG Collector report sections, providing cross-references to detailed analysis and supporting data.
+
+more health checks will be added with each new version .
+
+Database Health check list :
+```
+   1- Duplicate indexes
+   2- Invalid indexes
+   3- Unused Indexes
+   4- Autovacuum parameter
+   5- Sequences with less than 10% of the remain values
+   6- Orphaned prepared transactions
+   7- Connections without SSL
+   8- Enable_indexonlyscan parameter
+   9- Excessive logging parameters
+   10- Track_counts parameter
+   11- Enable_indexscan parameter
+   12- Synchronous_commit parameter
+   13- Invalid databases
+   14- Tables with more than 20% dead rows
+   15- Transaction ID TXID (Wraparound)
+   16- Tables that have autovacuum_enabled=off on table level
+   17- Inactive replication slots
+   18- Logical replication spill files
+   19- Outdated Extensions
+```
+### Example of The Observations section
+
+<img src="img/Observations_section.png" alt="">   
+
 ## PG Collector report header 
 <img src="img/pg_collector_header_V2.6.png" alt="">
 
@@ -43,7 +77,7 @@ All Sample reports in [sample report folder](https://github.com/awslabs/pg-colle
 ## PG Collector output
 
 ### Report name:
-PG Collector script will generate HTML file using the following naming convention pg_colletcor_[DB Name]-[timestamp].html .
+PG Collector script will generate HTML file using the following naming convention pg_collector_[DB Name]-[timestamp].html .
 
 [DB Name] : is the database name that you are connected to.
 
@@ -91,10 +125,13 @@ Type "help" for help.
 
 testdb=> \i pg_collector.sql
 Output format is html.
-Default footer is off.
+Output format is aligned.
+Query buffer reset (cleared).
+Report Generated Successfully
+Report name and location:  /tmp/pg_collector_testdb-2019-10-07_215146.html
 testdb=> \q
-mohamed@mydevhost ~ %ls -lhrt /tmp/pg_colletcor_*
--rw-r--r-- 1 mohamed mohamed 569K Oct  7 21:51 /tmp/pg_colletcor_testdb-2019-10-07_215146.html
+mohamed@mydevhost ~ %ls -lhrt /tmp/pg_collector_*
+-rw-r--r-- 1 mohamed mohamed 569K Oct  7 21:51 /tmp/pg_collector_testdb-2019-10-07_215146.html
 
 ```
 5-  open the report using any internet browser
@@ -102,7 +139,7 @@ mohamed@mydevhost ~ %ls -lhrt /tmp/pg_colletcor_*
 
 
 ## Notes:
-1- it is ok to see below errors while executing the pg_colletcor.sql script if you did not install pg_stat_statements extension
+1- it is ok to see below errors while executing the pg_collector.sql script if you did not install pg_stat_statements extension
 
 ```
 postgres=> \i pg_collector.sql
