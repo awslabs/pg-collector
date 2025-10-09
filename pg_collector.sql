@@ -2,14 +2,13 @@
 -- |  -- Script Name: pg_collector.sql                                                                           |
 -- |  -- Author : Mohamed Ali                                                                                    |
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
--- |  -- Description : Script to Collect PostgreSQL Database Informations                                        |
--- |                   and generate HTML Report                                                                  |
--- |  -- version : V1.1 for PostgreSQL 15                                                                        |
+-- |  -- Description : Script to collect PostgreSQL Database Information and generate HTML Report                |
+-- |  -- version : V1.2 for PostgreSQL 15                                                                        |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-15/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
-\H
+\pset format html
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
 \o /tmp/pg_collector_:filename.html
 \pset footer  off
@@ -61,7 +60,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 15</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.2 for PostgreSQL 15</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-15" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
@@ -125,7 +124,7 @@ select * from pg_database;
 \qecho </tr> 
 \qecho <tr> 
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#table_Access_Profile">Table Access Profile</a></td> 
-\qecho <td nowrap align="center" width="25%"><a class="link" href="#Unused_Indexes">Unused Indexes</a></td> 
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Unused Indexes">Unused Indexes</a></td> 
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Index_Access_Profile">Index Access Profile</a></td> 
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Fragmentation">Fragmentation (Bloat)</a></td> 
 \qecho </tr>
@@ -171,6 +170,12 @@ select * from pg_database;
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#COPY_command_progress">COPY command progress</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Invalid_databases">Invalid databases</a></td>
 \qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho </tr>
 \qecho </table>
 \qecho <br>
 \qecho <br>
@@ -205,7 +210,443 @@ select * from pg_database;
 \qecho <br>
 \qecho <br>
 \qecho <br>
+-- +----------------------------------------------------------------------------+
+-- |      - observations                                                     -  |
+-- +----------------------------------------------------------------------------+
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Observations</b></font><hr align="left" width="460">
+---------------------------------
+-- Check for duplicate indexes --
+---------------------------------
+select count(*) > 0 obsrv_duplicate_indexes
+from
+(
+SELECT pg_size_pretty(sum(pg_relation_size(idx))::bigint) as size,
+       (array_agg(idx))[1] as idx1, (array_agg(idx))[2] as idx2,
+       (array_agg(idx))[3] as idx3, (array_agg(idx))[4] as idx4
+FROM (
+    SELECT indexrelid::regclass as idx, (indrelid::text ||E'\n'|| indclass::text ||E'\n'|| indkey::text ||E'\n'||
+                                         coalesce(indexprs::text,'')||E'\n' || coalesce(indpred::text,'')) as key
+    FROM pg_index) sub
+GROUP BY key HAVING count(*)>1
+ORDER BY sum(pg_relation_size(idx)) DESC) AS t \gset
 
+\if :obsrv_duplicate_indexes
+    \qecho '&#8594; The database has duplicate indexes, please check the following section <a class="link" href="#Duplicate_indexes">Duplicate indexes</a> .'
+\else
+\endif
+--------------------------------------------------
+-- Check for database connections not using SSL --
+--------------------------------------------------
+SELECT count(*) > 0 obsrv_unsecured_conn_count
+FROM pg_stat_activity a JOIN pg_stat_ssl s ON a.pid = s.pid and s.ssl = false \gset
+
+\if :obsrv_unsecured_conn_count
+    \qecho <br>
+    \qecho '&#8594; The database has connections operating without SSL encryption, potentially exposing sensitive data to security risks. Please check the following section <a class="link" href="#ssl">SSL</a> .'
+\else
+\endif
+--------------------------------------------------
+-- Check for Orphaned prepared transactions     --
+--------------------------------------------------
+SELECT count(*) > 0 obsrv_orphaned_preptxn_count
+FROM pg_prepared_xacts WHERE now()-prepared >= interval '5' minute \gset
+
+\if :obsrv_orphaned_preptxn_count
+    \qecho <br>
+    \qecho '&#8594; The database has orphaned prepared transactions. Please check the following section <a class="link" href="#Orphaned_prepared_transactions">Orphaned prepared transactions</a> .'
+\else
+\endif
+-------------------------------
+-- Check for Invalid Indexes --
+-------------------------------
+
+select count(*) > 0  obsrv_invalid_indxes_count from pg_index WHERE pg_index.indisvalid = false \gset
+
+\if :obsrv_invalid_indxes_count
+    \qecho <br>
+    \qecho '&#8594; The database has Invalid Indexes, Please check the following section <a class="link" href="#invalid_indexes">Invalid indexes</a> .'
+\else
+\endif
+------------------------------------
+-- Check for autovacuum parameter --
+------------------------------------
+select count(*) > 0 obsrv_autovacuum_parameter_disabled
+FROM pg_settings WHERE name = 'autovacuum' and setting != 'on'   \gset
+
+
+ \if :obsrv_autovacuum_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The autovacuum parameter is disabled, Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+ \else
+ \endif
+
+
+
+--------------------------------------
+-- Check for track_counts parameter --
+--------------------------------------
+select count(*) > 0 obsrv_track_counts_parameter_disabled
+FROM pg_settings WHERE name = 'track_counts' and setting != 'on'   \gset
+
+
+ \if :obsrv_track_counts_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The track_counts parameter is disabled, Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+ \else
+ \endif
+
+
+----------------------------------------------
+-- Check for enable_indexonlyscan parameter --
+----------------------------------------------
+select count(*) > 0 obsrv_enable_indexonlyscan_parameter_disabled
+FROM pg_settings WHERE name = 'enable_indexonlyscan' and setting != 'on'   \gset
+
+
+ \if :obsrv_enable_indexonlyscan_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The enable_indexonlyscan parameter is disabled, Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+ \else
+ \endif
+
+------------------------------------------
+-- Check for enable_indexscan parameter --
+------------------------------------------
+select count(*) > 0 obsrv_enable_indexscan_parameter_disabled
+FROM pg_settings WHERE name = 'enable_indexscan' and setting != 'on'   \gset
+
+
+ \if :obsrv_enable_indexscan_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The enable_indexscan parameter is disabled, Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+ \else
+ \endif
+
+------------------------------------------
+-- Check for Unused_Indexes --
+------------------------------------------
+select count(*) > 0 obsrv_unused_indexes
+FROM pg_catalog.pg_stat_all_indexes ai , pg_index i
+WHERE ai.indexrelid=i.indexrelid
+and ai.idx_scan = 0 
+and ai.schemaname not in ('pg_catalog','pg_toast') \gset
+
+ \if :obsrv_unused_indexes
+     \qecho <br>
+     \qecho '&#8594; The database has unused indexes, Please check the following section <a class="link" href="#Unused Indexes">Unused Indexes</a> .'
+ \else
+ \endif
+
+------------------------------------------
+-- Check for Inactive Replication Slots --
+------------------------------------------
+SELECT count(*) > 0 obsrv_inactive_rep_slots
+FROM pg_replication_slots WHERE active='f' \gset
+
+
+ \if :obsrv_inactive_rep_slots
+     \qecho <br>
+     \qecho '&#8594; The database has inactive replication slots, Please check the following section <a class="link" href="#Replication">Replication</a> .'
+ \else
+ \endif
+
+------------------------------------------
+-- Check for Low remaining sequences --
+------------------------------------------
+SELECT count(1) as obsrv_less_remaining_sequences FROM (SELECT 
+    schemaname as Schema,
+    sequencename as Sequence_Name,
+    data_type::regtype as Data_Type,
+    last_value as Current_Value,
+    max_value as Max_Value,
+    min_value as Min_Value,
+    increment_by as Increment_By,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Limit'
+        ELSE round(((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100), 2)::text || '%'
+    END as Remaining_Percentage,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Action Needed'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 1 
+        THEN 'CRITICAL: Less than 1% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 5 
+        THEN 'WARNING: Less than 5% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 10 
+        THEN 'NOTICE: Less than 10% remaining'
+        ELSE 'OK'
+    END as Status
+FROM pg_sequences) seq WHERE status not in ('OK', 'No Action Needed') \gset
+
+ \if :obsrv_less_remaining_sequences
+     \qecho <br>
+     \qecho '&#8594; The database has sequences with less than 10% remaining values, Please check the following section <a class="link" href="#sequences">sequences</a> .'
+ \else
+ \endif
+
+-----------------------------------------------
+-- Check for log_statement Excessive Logging --
+-----------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_logging_logstatement 
+FROM pg_settings
+WHERE name = 'log_statement' and setting IN ('all', 'mod') \gset
+
+\if :obsrv_excessive_logging_logstatement
+     \qecho <br>
+     \qecho '&#8594; The log_statement parameter is set to all or mod. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_min_duration_statement Excessive Logging --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_logging_logsmindurstmt
+FROM pg_settings
+WHERE name = 'log_min_duration_statement' and setting IN ('0') \gset
+
+\if :obsrv_excessive_logging_logsmindurstmt
+     \qecho <br>
+     \qecho '&#8594; The log_min_duration_statement parameter is set to 0. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_min_messages Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_logging_logsminmsgs
+FROM pg_settings
+WHERE name = 'log_min_messages' and setting IN ('debug5', 'debug4', 'debug3', 'debug2', 'debug1') \gset
+
+\if :obsrv_excessive_logging_logsminmsgs
+     \qecho <br>
+     \qecho '&#8594; The log_min_messages parameter is set to DEBUG[n]. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_statement_stats Excessive Logging        --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_log_stmt_stats
+FROM pg_settings
+WHERE name = 'log_statement_stats' and setting IN ('on') \gset
+
+\if :obsrv_excessive_log_stmt_stats
+     \qecho <br>
+     \qecho '&#8594; The log_statement_stats parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_parser_stats Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_log_parser_stats
+FROM pg_settings
+WHERE name = 'log_parser_stats' and setting IN ('on') \gset
+
+\if :obsrv_excessive_log_parser_stats
+     \qecho <br>
+     \qecho '&#8594; The log_parser_stats parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_planner_stats Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_log_planner_stats
+FROM pg_settings
+WHERE name = 'log_planner_stats' and setting IN ('on') \gset
+
+\if :obsrv_excessive_log_planner_stats
+     \qecho <br>
+     \qecho '&#8594; The log_planner_stats parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for log_executor_stats Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_log_executor_stats
+FROM pg_settings
+WHERE name = 'log_executor_stats' and setting IN ('on') \gset
+
+\if :obsrv_excessive_log_executor_stats
+     \qecho <br>
+     \qecho '&#8594; The log_executor_stats parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for debug_print_parse Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_debug_print_parse
+FROM pg_settings
+WHERE name = 'debug_print_parse' and setting IN ('on') \gset
+
+\if :obsrv_excessive_debug_print_parse
+     \qecho <br>
+     \qecho '&#8594; The debug_print_parse parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for debug_print_rewritten Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_debug_print_rewritten
+FROM pg_settings
+WHERE name = 'debug_print_rewritten' and setting IN ('on') \gset
+
+\if :obsrv_excessive_debug_print_rewritten
+     \qecho <br>
+     \qecho '&#8594; The debug_print_rewritten parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+------------------------------------------------------------
+-- Check for debug_print_plan Excessive Logging           --
+------------------------------------------------------------
+SELECT count(*) > 0 obsrv_excessive_debug_print_plan
+FROM pg_settings
+WHERE name = 'debug_print_plan' and setting IN ('on') \gset
+
+\if :obsrv_excessive_debug_print_plan
+     \qecho <br>
+     \qecho '&#8594; The debug_print_plan parameter is set to on. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+
+--------------------------------------------
+-- Check for synchronous_commit parameter --
+--------------------------------------------
+select count(*) > 0 obsrv_synchronous_commit_parameter_disabled
+FROM pg_settings WHERE name = 'synchronous_commit' and setting = 'off'   \gset
+
+
+ \if :obsrv_synchronous_commit_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The synchronous_commit parameter is disabled, Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+---------------------------------
+-- Check for Invalid databases --
+---------------------------------
+select count(*) > 0 obsrv_invalid_databases
+FROM pg_database WHERE datconnlimit = '-2'  \gset
+
+
+\if :obsrv_invalid_databases
+     \qecho <br>
+     \qecho '&#8594; The database has Invalid Database, Please check the following section <a class="link" href="#Invalid_databases">Invalid databases</a> .'
+\else
+\endif
+
+------------------------------------------------------------------------------------------------------
+-- Check for tables that have more than 20% dead rows and (n_live_tup > 1000 or n_dead_tup > 1000)  --
+------------------------------------------------------------------------------------------------------
+select count(*) > 0 obsrv_tables_more_than_20pct_dead_rows from pg_stat_all_tables where n_dead_tup::float/nullif(n_live_tup+n_dead_tup,0) >.2  and (n_live_tup > 1000 or n_dead_tup > 1000)  \gset
+\if :obsrv_tables_more_than_20pct_dead_rows
+     \qecho <br>
+     \qecho '&#8594; The database has tables that have more than 20% dead rows, Please check the following section <a class="link" href="#vacuum_Statistics">Vacuum & Statistics</a> .'
+\else
+\endif
+
+---------------------------------------------------------------------------------
+-- Check for tables that have autovacuum_enabled=off|false on the table level  --
+---------------------------------------------------------------------------------
+select count(*) > 0 obsrv_tables_autovacuum_enabled_off from pg_class where reloptions::text like '%autovacuum_enabled=off%' or pg_class.reloptions::text like '%autovacuum_enabled=false%'    \gset
+\if :obsrv_tables_autovacuum_enabled_off
+     \qecho <br>
+     \qecho '&#8594; The database has tables that have autovacuum disabled (autovacuum_enabled=off|false) on the table level, Please check the following section <a class="link" href="#vacuum_Statistics">Vacuum & Statistics</a> .'
+\else
+\endif
+
+------------------------------------------
+-- Check for Critical XID Age --
+------------------------------------------
+SELECT count(*) > 0 obsrv_critical_xid_age
+FROM (
+    SELECT max(age(datfrozenxid)) as oldest_xid 
+    FROM pg_database
+    HAVING max(age(datfrozenxid)) >= 300000000
+) AS t \gset
+
+\if :obsrv_critical_xid_age
+     \qecho <br>
+     \qecho '&#8594; Critical Transaction ID (XID) age detected. Please check the following section <a class="link" href="#Transaction_ID_TXID">Transaction ID TXID (Wraparound)</a>'
+ \endif
+
+---------------------------------------------------------------------------------
+-- Check for autovacuum freeze max age                                         --
+---------------------------------------------------------------------------------
+select count(*) > 0 obsrv_autovacuum_freeze_max_age FROM pg_settings WHERE name = 'autovacuum_freeze_max_age' and setting::bigint > 200000000   \gset
+   
+\if :obsrv_autovacuum_freeze_max_age
+  \qecho <br>
+  \qecho '&#8594; The autovacuum_freeze_max_age parameter is set to a value bigger than 200 millions , Please check the following section <a class="link" href="#Transaction_ID_TXID">Transaction ID TXID (Wraparound)</a>'
+\else
+\endif
+
+---------------------------------------------------------------------------------
+-- Check for logical replication spills                                        --
+---------------------------------------------------------------------------------
+select count(*) > 0 obsrv_logical_replication_spills from pg_stat_replication_slots where spill_count > 0 and spill_bytes > 0 \gset
+
+\if :obsrv_logical_replication_spills
+     \qecho <br>
+     \qecho '&#8594; The database has logical replication spills, Please check the following section <a class="link" href="#Replication">Replication</a> .'
+\else
+\endif
+
+---------------------------------------------------------------------------------
+-- Check for Installed Extensions that require update                          --
+---------------------------------------------------------------------------------
+with recursive version_parts as (
+    select name, extversion, version, installed,
+           (string_to_array(regexp_replace(regexp_replace(extversion, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ext_ver_parts,
+           (string_to_array(regexp_replace(regexp_replace(version, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ver_parts
+    from 
+        (select extname, extversion from pg_extension) a,
+        (select name, version, installed 
+         from pg_available_extension_versions 
+         where name in (select extname from pg_extension)) b
+    where a.extname = b.name
+)
+select count(*) > 0 obsrv_extensions_update_available
+from (
+select 
+    name as extension_name, 
+    extversion as installed_version, 
+    version as latest_available_version
+from (
+    select 
+        name, 
+        extversion, 
+        version,
+        rank() over (partition by name order by 
+            ver_parts[1] desc nulls last,
+            ver_parts[2] desc nulls last,
+            ver_parts[3] desc nulls last) as myrank
+    from version_parts
+    where ver_parts[1] > ext_ver_parts[1]
+       or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] > ext_ver_parts[2])
+       or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] = ext_ver_parts[2] and ver_parts[3] > ext_ver_parts[3])
+) e
+where myrank = 1 
+) as t \gset
+
+\if :obsrv_extensions_update_available
+     \qecho <br>
+     \qecho '&#8594; The database has installed extensions that require updates, Please check the following section <a class="link" href="#Extensions">Extensions</a> .'
+\else
+\endif
+
+---------------------------------
+-- Add a new check             --
+---------------------------------
+\qecho <br>
+\qecho <br>
+\qecho <br>
+\qecho <br>
 -- +----------------------------------------------------------------------------+
 -- |      - Database_size                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -225,6 +666,211 @@ SELECT pg_database.datname Database_Name , pg_size_pretty(pg_database_size(pg_da
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Transaction ID TXID (Wraparound)</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
+-- +----------------------------------------------------------------------------+
+-- |      - Vacuum Blockers                                  -                  |
+-- +----------------------------------------------------------------------------+
+\qecho <h3>Vacuum Blockers :</h3>
+\qecho 'NOTE: the vacuum blocker will check if the XID age is above 300 million'
+\qecho <br>
+------------------------------------------
+-- 1. Check for Inactive Replication Slots --
+------------------------------------------
+SELECT count(*) > 0 obsrv_inactive_rep_slots
+FROM pg_replication_slots WHERE active='f' \gset
+
+
+ \if :obsrv_inactive_rep_slots
+     \qecho <br>
+     \qecho <h4>'The database has inactive replication slots, Please check the following section <a class="link" href="#Replication">Replication</a> .'</h4>
+ \else
+     \qecho 'No inactive replication slot found'
+ \endif
+
+\qecho <br>
+--------------------------------------------------
+-- 2. Check for Orphaned prepared transactions     --
+--------------------------------------------------
+SELECT count(*) > 0 obsrv_orphaned_preptxn_count
+FROM pg_prepared_xacts WHERE age(transaction) > 300000000 \gset
+
+\if :obsrv_orphaned_preptxn_count
+    \qecho <br>
+    \qecho <h4>'The database has orphaned prepared transactions. Please check the following section <a class="link" href="#Orphaned_prepared_transactions">Orphaned prepared transactions</a> .'</h4>
+\else
+    \qecho 'No orphaned prepared transactions found'
+\endif
+\qecho <br>
+------------------------------------------
+--  3. Check for Active Logical Replication Slots with Lag --
+------------------------------------------
+SELECT count(*) > 0 as obsrv_active_logical_slots_lag
+FROM pg_replication_slots
+WHERE active = true 
+  AND slot_type = 'logical'
+  AND age(catalog_xmin) >= 300000000 \gset
+
+\if :obsrv_active_logical_slots_lag
+    \qecho <h4>Active Logical Replication Slots with High XID Age (Potential Lag):</h4>
+    SELECT slot_name, 
+           age(catalog_xmin) as xid_age,
+           restart_lsn,
+           confirmed_flush_lsn
+    FROM pg_replication_slots  
+    WHERE active = true 
+      AND slot_type = 'logical'
+      AND age(catalog_xmin) >= 300000000
+    ORDER BY age(catalog_xmin) DESC;
+
+    \qecho <h5>Recommendations:</h5>
+    \qecho <ul>
+    \qecho <li>Check the status of subscriber and ensure it is consuming data</li>
+    \qecho <li>Investigate potential network issues between publisher and subscriber</li>
+    \qecho <li>Consider increasing resources on the subscriber if it is lagging behind</li>
+    \qecho <li>Monitor replication lag regularly and set up alerts for excessive lag</li>
+    \qecho </ul>
+\else
+    \qecho 'No active Logical Replication Slots with high XID age found'
+\endif
+\qecho <br>
+------------------------------------------
+--  4. Check for Long-Running Active Transactions --
+------------------------------------------
+SELECT count(*) > 0 as obsrv_long_running_txn
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND age(coalesce(backend_xmin, backend_xid)) >= 300000000 \gset
+
+\if :obsrv_long_running_txn
+    \qecho <h4>Long-Running Active Transactions:</h4>
+    SELECT pid,
+           datname,
+           usename,
+           state,
+           age(coalesce(backend_xmin, backend_xid)) as xid_age,
+           query_start,
+           xact_start,
+           now() - xact_start AS xact_duration,
+           now() -query_start AS query_duration,
+           query
+    FROM pg_stat_activity
+    WHERE state != 'idle' AND query not ilike 'autovacuum %'
+      AND age(coalesce(backend_xmin, backend_xid)) >= 300000000
+    ORDER BY age(coalesce(backend_xmin, backend_xid)) DESC;
+
+    \qecho <h5>Recommendations:</h5>
+    \qecho <ul>
+    \qecho <li>Investigate why these transactions are running for so long</li>
+    \qecho <li>Consider optimizing or terminating long-running queries</li>
+    \qecho <li>Implement transaction timeout mechanisms in your application</li>
+    \qecho <li>Set up monitoring and alerts for long-running transactions</li>
+    \qecho </ul>
+\else
+    \qecho 'No long running queries found'
+\endif
+\qecho <br>
+------------------------------------------
+-- 5. Check for Physical Replication with Hot Standby Feedback --
+------------------------------------------
+WITH hsf_xid_age AS (
+    SELECT coalesce(greatest(
+        (SELECT max(nullif(age(backend_xmin),2147483647)) FROM pg_stat_replication),
+        (SELECT max(nullif(age(xmin),2147483647)) FROM pg_replication_slots where slot_type = 'physical'),
+        (SELECT max(nullif(age(catalog_xmin),2147483647)) FROM pg_replication_slots where slot_type = 'physical')
+    ),0) as oldest_hot_standby_feedback_xid_age
+)
+SELECT (oldest_hot_standby_feedback_xid_age >= 300000000) as obsrv_hsf_critical
+FROM hsf_xid_age \gset
+
+\if :obsrv_hsf_critical
+    \qecho <h4>Active Physical Replication Slots with High XID Age</h4>
+    
+    -- Check physical replication slots
+    \qecho <h4>Physical Replication Slots:</h4>
+    SELECT slot_name,
+           active,
+           age(xmin) as xid_age,
+           restart_lsn,
+           confirmed_flush_lsn
+    FROM pg_replication_slots
+    WHERE slot_type = 'physical'
+      AND age(xmin) >= 300000000
+    ORDER BY age(xmin) DESC;
+
+    \qecho <h5>Current XID Age Status:</h5>
+    SELECT coalesce(greatest(
+        (SELECT max(nullif(age(backend_xmin),2147483647)) FROM pg_stat_replication),
+        (SELECT max(nullif(age(xmin),2147483647)) FROM pg_replication_slots where slot_type = 'physical'),
+        (SELECT max(nullif(age(catalog_xmin),2147483647)) FROM pg_replication_slots where slot_type = 'physical')
+    ),0) as oldest_hot_standby_feedback_xid_age;
+
+\qecho <h5>Recommendations:</h5>
+\qecho <ul>
+\qecho <li>High XID age in physical replication indicates:</li>
+\qecho <ul>
+\qecho <li>Long-running queries on replica</li>
+\qecho <li>Inactive logical replication slots on replica</li>
+\qecho </ul>
+\qecho <li>To address long-running queries on replica:</li>
+\qecho <ul>
+\qecho <li>Identify long-running queries:</li>
+\qecho 'SELECT pid, query, now()-query_start as running_since'
+\qecho 'FROM pg_stat_activity'
+\qecho 'WHERE state != ''idle'' AND now()-query_start > interval ''1 hour'''
+\qecho 'ORDER BY running_since DESC;'
+\qecho <li>Terminate problematic queries if necessary:</li>
+\qecho 'SELECT pg_terminate_backend(pid);'
+\qecho <li>Review and optimize queries causing long-running transactions</li>
+\qecho <li>Consider implementing statement_timeout on the replica</li>
+\qecho </ul>
+\qecho <li>To clear inactive replication slots on replica:</li>
+\qecho <ul>
+\qecho <li>Identify inactive replication slots:</li>
+\qecho 'SELECT slot_name, slot_type, active'
+\qecho 'FROM pg_replication_slots'
+\qecho 'WHERE NOT active;'
+\qecho <li>Drop inactive slots that are no longer needed:</li>
+\qecho 'SELECT pg_drop_replication_slot(''slot_name'');'
+\qecho <li>If slot is needed, investigate why it became inactive and reactivate if necessary</li>
+\qecho </ul>
+\qecho </ul>
+\else
+    \qecho 'No Physical Replication Slots with high XID age found'
+\endif
+
+------------------------------------------
+-- 6. Check for Aurora Reader XID Age --
+------------------------------------------
+select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
+\if :isaurora
+WITH aurora_reader_age AS (
+    SELECT coalesce(greatest(
+        (SELECT max(nullif(age(feedback_xmin::text::xid),2147483647)) FROM aurora_replica_status()),
+        (SELECT max(nullif(age(feedback_xmin::text::xid),2147483647)) FROM aurora_global_db_status())
+    ),0) as oldest_reader_feedback_xid_age
+)
+SELECT (oldest_reader_feedback_xid_age >= 300000000) as obsrv_aurora_reader_critical 
+FROM aurora_reader_age \gset
+
+\if :obsrv_aurora_reader_critical
+    \qecho <h4>Aurora Global Database Status:</h4>
+    SELECT aws_region,
+           highest_lsn_written,
+           durability_lag_in_msec,
+           rpo_lag_in_msec,
+           last_lag_calculation_time,
+           feedback_epoch,
+           age(feedback_xmin::text::xid) as xid_age
+    FROM aurora_global_db_status()
+    WHERE age(feedback_xmin::text::xid) >= 300000000
+    ORDER BY age(feedback_xmin::text::xid) DESC;
+
+    \qecho <h5>Recommendations:</h5>
+    \qecho <ul>
+    \qecho <li>Review Aurora global database replicas for long running queries and inactive replication slots</li>
+    \qecho </ul>
+\endif
+\endif
+
 \qecho <h3>oldest xid:</h3>
 
 SELECT max(age(datfrozenxid)) oldest_xid FROM pg_database;
@@ -430,6 +1076,7 @@ WHERE c.relkind in ('r', 't','m')
 order by 2 desc limit 20) as r1 )
 order by 2,4 ;
 
+
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -632,7 +1279,7 @@ select schemaname as schema_name,relname AS table_name,n_live_tup, n_tup_upd, n_
 \qecho <h3>Tables have more than 20% dead rows :</h3>
 \qecho <br>
 \qecho <details>
-select schemaname,relname , last_vacuum,last_autovacuum,n_live_tup,n_dead_tup , trunc((n_dead_tup::numeric/nullif(n_live_tup+n_dead_tup,0))* 100,2) as "n_dead_tup_%" from pg_stat_user_tables where n_dead_tup::float/nullif(n_live_tup+n_dead_tup,0) >.2 order by n_live_tup desc ;
+select schemaname,relname , last_vacuum,last_autovacuum,n_live_tup,n_dead_tup , trunc((n_dead_tup::numeric/nullif(n_live_tup+n_dead_tup,0))* 100,2) as "n_dead_tup_%" from pg_stat_all_tables  where n_dead_tup::float/nullif(n_live_tup+n_dead_tup,0) >.2 order by n_live_tup desc ;
 \qecho </details>
 \qecho <br>
 \qecho <h3>pg_stat_all_tables : </h3>
@@ -685,11 +1332,16 @@ select count (*) from pg_stat_all_tables  where  autoanalyze_count = 0 and autov
 select relname,schemaname,last_vacuum,vacuum_count,last_autovacuum,autovacuum_count,last_autoanalyze,autoanalyze_count,last_analyze,analyze_count from pg_stat_all_tables  where  autoanalyze_count = 0 and autovacuum_count  = 0 and analyze_count = 0 and vacuum_count=0 ;  
 \qecho </details>
 \qecho <br>
--- to show tables that have specific table-level parameters set
+\qecho <h3>Tables that have autovacuum disabled (autovacuum_enabled=off|false) on the table level : </h3>
+\qecho <br>
+\qecho <details>
+select relname as table_name , pg_namespace.nspname as schema_name ,reloptions from pg_class  ,pg_namespace  where (pg_class.reloptions::text like '%autovacuum_enabled=off%'  or  pg_class.reloptions::text like '%autovacuum_enabled=false%' ) and pg_class.relnamespace = pg_namespace.oid ;
+\qecho </details>
+\qecho <br>
 \qecho <h3>Tables that have specific table-level parameters set : </h3>
 \qecho <br>
 \qecho <details>
-select relname, reloptions from pg_class where reloptions is not null;
+select relname as table_name , pg_namespace.nspname as schema_name ,reloptions from pg_class ,pg_namespace  where pg_class.reloptions is not null and pg_class.relnamespace = pg_namespace.oid ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -712,26 +1364,37 @@ SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "S
 FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
 ORDER BY 1;
 \qecho <br>
-\qecho <h3>Available Extension versions that are available to upgrade the installed Extension: </h3>
-select b.name as extension_name , b.version as version ,b.installed as installed
-from
-(SELECT extname ,extversion FROM pg_extension) a ,
-(SELECT name ,version ,installed FROM pg_available_extension_versions where name in (SELECT extname FROM pg_extension)) b
-where a.extname = b.name
-and b.version > a.extversion
-order by b.name , b.version;
-\qecho <br>
-\qecho <h3>Latest Extension version that is available to upgrade the installed Extension: </h3>
-select name as extension_name , max(version) as latest_version
-from
-(select b.name , b.version ,b.installed
-from
-(SELECT extname ,extversion FROM pg_extension) a ,
-(SELECT name ,version ,installed FROM pg_available_extension_versions where name in (SELECT extname FROM pg_extension)) b
-where a.extname = b.name
-and b.version > a.extversion
-order by b.name , b.version ) e
-group by name ;
+\qecho <h3>Available Extension Updates - Latest Versions: </h3>
+with recursive version_parts as (
+    select name, extversion, version, installed,
+           (string_to_array(regexp_replace(regexp_replace(extversion, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ext_ver_parts,
+           (string_to_array(regexp_replace(regexp_replace(version, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ver_parts
+    from 
+        (select extname, extversion from pg_extension) a,
+        (select name, version, installed 
+         from pg_available_extension_versions 
+         where name in (select extname from pg_extension)) b
+    where a.extname = b.name
+)
+select 
+    name as extension_name, 
+    extversion as installed_version, 
+    version as latest_available_version
+from (
+    select 
+        name, 
+        extversion, 
+        version,
+        rank() over (partition by name order by 
+            ver_parts[1] desc nulls last,
+            ver_parts[2] desc nulls last,
+            ver_parts[3] desc nulls last) as myrank
+    from version_parts
+    where ver_parts[1] > ext_ver_parts[1]
+       or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] > ext_ver_parts[2])
+       or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] = ext_ver_parts[2] and ver_parts[3] > ext_ver_parts[3])
+) e
+where myrank = 1 order by name;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Available extensions: </h3>
@@ -772,7 +1435,7 @@ select
 round((sum(blks_hit)::numeric / (sum(blks_hit) + sum(blks_read)::numeric))*100,2) as cache_read_hit_percentage
 from pg_stat_database ;
 \qecho <br>
-\qecho cach read hit per Database 
+\qecho cache read hit per Database 
 select datname as database_name, 
 round((blks_hit::numeric / (blks_hit + blks_read)::numeric)*100,2) as cache_read_hit_percentage
 from pg_stat_database 
@@ -781,7 +1444,7 @@ and datname is not null
 order by 2 desc;
 \qecho </details>
 \qecho <br>
-\qecho cach read hit per table
+\qecho cache read hit per table
 \qecho <br>
 \qecho <details>
 SELECT schemaname,relname as table_name,
@@ -829,36 +1492,41 @@ SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "S
 select name as parameter_name, setting  from pg_settings where name in ('pg_stat_statements.track','pg_stat_statements.track_utility','pg_stat_statements.save'
 ,'pg_stat_statements.max','shared_preload_libraries');
 \qecho <br>
-\qecho <h3>Available versions that are available to upgrade: </h3>
-select * from
-(
-select b.name as extension_name , b.version as version ,b.installed as installed
-from
-(SELECT extname ,extversion FROM pg_extension) a ,
-(SELECT name ,version ,installed FROM pg_available_extension_versions where name in (SELECT extname FROM pg_extension)) b
-where a.extname = b.name
-and b.version > a.extversion
-order by b.name , b.version
-) as r
-where r.extension_name='pg_stat_statements';
-;
-\qecho <br>
-\qecho <h3>Latest Extension version that is available to upgrade: </h3>
-select * from
-(
-select name as extension_name , max(version) as latest_version
-from
-(select b.name , b.version ,b.installed
-from
-(SELECT extname ,extversion FROM pg_extension) a ,
-(SELECT name ,version ,installed FROM pg_available_extension_versions where name in (SELECT extname FROM pg_extension)) b
-where a.extname = b.name
-and b.version > a.extversion
-order by b.name , b.version ) e
-group by name
-) as r
-where r.extension_name='pg_stat_statements';
-;
+\qecho <h3>Latest pg_stat_statements Extension version that is available to upgrade: </h3>
+with recursive version_parts as (
+    select name, extversion, version, installed,
+           (string_to_array(regexp_replace(regexp_replace(extversion, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ext_ver_parts,
+           (string_to_array(regexp_replace(regexp_replace(version, '[a-zA-Z]', '', 'g'), '-', '.', 'g'), '.'))::int[] as ver_parts
+    from 
+        (select extname, extversion from pg_extension) a,
+        (select name, version, installed 
+         from pg_available_extension_versions 
+         where name in (select extname from pg_extension)) b
+    where a.extname = b.name
+)
+select 
+    name as extension_name, 
+    extversion as installed_version, 
+    version as latest_available_version,
+    upgrade_status as extension_upgrade_status 
+from (
+    select 
+        name, 
+        extversion, 
+        version,
+        rank() over (partition by name order by 
+            ver_parts[1] desc nulls last,
+            ver_parts[2] desc nulls last,
+            ver_parts[3] desc nulls last) as myrank,
+        case when ver_parts[1] > ext_ver_parts[1]
+          or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] > ext_ver_parts[2])
+          or (ver_parts[1] = ext_ver_parts[1] and ver_parts[2] = ext_ver_parts[2] and ver_parts[3] > ext_ver_parts[3])
+          then 'extension upgrade available' else 'up-to-date' end as upgrade_status
+    from version_parts
+    where name = 'pg_stat_statements'
+) e
+where myrank = 1
+order by name;
 \qecho </details>
 \qecho <br>        
 \qecho <h3> pg_stat_statements_info view: </h3>       
@@ -866,13 +1534,22 @@ where r.extension_name='pg_stat_statements';
 \qecho <details>
 \qecho <h4> The statistics of the pg_stat_statements module itself are tracked and made available via a view named pg_stat_statements_info </h4>
 \qecho <h4> dealloc column show the Total number of times pg_stat_statements entries about the least-executed statements were deallocated because more distinct statements than pg_stat_statements.max were observed </h4> 
-select * from pg_stat_statements_info ;
+
+select count(*) > 0 as v_pgstatextv19 from pg_extension where extname = 'pg_stat_statements' and (regexp_split_to_array(extversion, '\.'))[1]::bigint >= 1 and (regexp_split_to_array(extversion, '\.'))[2]::bigint > 8 \gset
+
+\if :v_pgstatextv19
+  select * from pg_stat_statements_info ;
+\else
+  \qecho <h4> Note: The pg_stat_statements_info view is available from pg_stat_statements version 1.9 and later </h4>
+\endif
+
 \qecho </details>
 \qecho <br>
 \qecho <h3> Top SQL order by total_exec_time: </h3>
 \qecho <br>
 \qecho <details>
 --Top SQL order by total_exec_time
+\if :v_pgstatextv19
 select queryid,substring(query,1,60) as query , calls, 
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -884,6 +1561,19 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by total_time_Msec desc limit 20;
+\else
+select queryid,substring(query,1,60) as query , calls,
+round(total_time::numeric, 2) as total_time_Msec, 
+round((total_time::numeric/1000), 2) as total_time_sec,
+round(mean_time::numeric,2) as avg_time_Msec,
+round((mean_time::numeric/1000),2) as avg_time_sec,
+round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+from pg_stat_statements 
+order by total_time_Msec desc limit 20;
+\endif
 \qecho </details>
 
 \qecho <br>
@@ -891,6 +1581,7 @@ order by total_time_Msec desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by avg_time
+\if :v_pgstatextv19
 select queryid,substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -902,6 +1593,19 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by avg_time_Msec desc limit 20;
+\else
+select queryid,substring(query,1,60) as query , calls,
+round(total_time::numeric, 2) as total_time_Msec, 
+round((total_time::numeric/1000), 2) as total_time_sec,
+round(mean_time::numeric,2) as avg_time_Msec,
+round((mean_time::numeric/1000),2) as avg_time_sec,
+round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+from pg_stat_statements 
+order by avg_time_Msec desc limit 20;
+\endif
 \qecho </details>
 
 \qecho <br>
@@ -909,6 +1613,7 @@ order by avg_time_Msec desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by percent of total DB time
+\if :v_pgstatextv19
 select queryid,substring(query,1,60) as query , calls, 
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -920,6 +1625,19 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by percent desc limit 20;
+\else
+select queryid,substring(query,1,60) as query , calls, 
+round(total_time::numeric, 2) as total_time_Msec, 
+round((total_time::numeric/1000), 2) as total_time_sec,
+round(mean_time::numeric,2) as avg_time_Msec,
+round((mean_time::numeric/1000),2) as avg_time_sec,
+round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+from pg_stat_statements 
+order by percent desc limit 20;
+\endif
 \qecho </details>
 
 \qecho <br>
@@ -927,6 +1645,7 @@ order by percent desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by number of execution (CALLs)  
+\if :v_pgstatextv19  
 select queryid,substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -938,6 +1657,19 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by calls desc limit 20;
+\else
+select queryid,substring(query,1,60) as query , calls,
+round(total_time::numeric, 2) as total_time_Msec, 
+round((total_time::numeric/1000), 2) as total_time_sec,
+round(mean_time::numeric,2) as avg_time_Msec,
+round((mean_time::numeric/1000),2) as avg_time_sec,
+round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
+from pg_stat_statements 
+order by calls desc limit 20;
+\endif
 \qecho </details>
 
 \qecho <br>
@@ -945,6 +1677,7 @@ order by calls desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by shared blocks read (physical reads) 
+\if :v_pgstatextv19 
 select queryid, substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -957,6 +1690,20 @@ round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as per
 shared_blks_read
 from pg_stat_statements 
 order by shared_blks_read desc limit 20;
+\else
+select queryid, substring(query,1,60) as query , calls,
+round(total_time::numeric, 2) as total_time_Msec, 
+round((total_time::numeric/1000), 2) as total_time_sec,
+round(mean_time::numeric,2) as avg_time_Msec,
+round((mean_time::numeric/1000),2) as avg_time_sec,
+round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
+round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
+round(rows::numeric/calls,2) rows_per_exec,
+round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent,
+shared_blks_read
+from pg_stat_statements 
+order by shared_blks_read desc limit 20;
+\endif
 \qecho </details>
 \else
     \if yes
@@ -1309,9 +2056,23 @@ order by physical_reads_percent  desc limit 50  ;
 -- +----------------------------------------------------------------------------+
 
 
-\qecho <a name="Unused_Indexes"></a>
+\qecho <a name="Unused Indexes"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Unused Indexes</b></font><hr align="left" width="460">
 \qecho <br>
+\qecho <h4> Unused indexes are indexes that exist in the database but have not been used for queries over a period of time. </h4>
+\qecho <h4> While they consume disk space and impact write performance, they provide no benefit to query performance. </h4>
+\qecho <h4> They increase backup time, storage requirements and add overhead to database maintenance tasks such as VACUUM hence it is recommended to remove the unused indexes. </h4>
+\qecho <h4> Before removing unused indexes, consider the following factors:</h4>
+\qecho <ul>
+\qecho <li> Indexes enforcing uniqueness constraints must not be removed as they ensure data integrity.  </li>
+\qecho <li> In a database setup with read replicas, indexes used only on the replicas will appear unused if this report is generated on the primary (writer) instance. Consider checking index usage on all replicas before deciding to remove an index. </li>
+\qecho <li> Check when statistics were last reset. Long periods ensure more accurate stats: </li>
+\qecho <code>SELECT datname as "Database",</code>
+\qecho <code>       pg_stat_get_db_stat_reset_time(oid) as "Last Reset Time",</code>
+\qecho <code>       now() - pg_stat_get_db_stat_reset_time(oid) as "Time Since Reset"</code>
+\qecho <code>FROM pg_database</code>
+\qecho <code>WHERE datname = current_database();</code>
+\qecho </ul>
 \qecho <details>
 SELECT ai.schemaname,ai.relname AS tablename,ai.indexrelid  as index_oid ,
 ai.indexrelname AS indexname,i.indisunique ,
@@ -1321,7 +2082,7 @@ pg_size_pretty(pg_relation_size(ai.indexrelid)) AS pretty_index_size
 FROM pg_catalog.pg_stat_all_indexes ai , pg_index i
 WHERE ai.indexrelid=i.indexrelid
 and ai.idx_scan = 0 
-and ai.schemaname not in ('pg_catalog')
+and ai.schemaname not in ('pg_catalog','pg_toast')
 order by index_size desc;
 \qecho </details>
 
@@ -1600,11 +2361,11 @@ ORDER BY 8 desc;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Toast Tables Mapping</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <h3> Note:</h3>
-\qecho <h4> When a column is written to the toast table, an OID is used to identify the chunk to be toasted. When a toast table grows very large, and contains chunk_ids that are nearing the value of 2^32, it can lead to performance degredation when writing to toast. This is because PostgreSQL must check if an OID is available for assignment by scanning the table </h4>
+\qecho <h4> When a column is written to the toast table, an OID is used to identify the chunk to be toasted. When a toast table grows very large, and contains chunk_ids that are nearing the value of 2^32 (4 billion), it can lead to performance degredation when writing to toast. This is because PostgreSQL must check if an OID is available for assignment by scanning the table </h4>
 \qecho <h4> A large Toast table can be a good indication that your toast can face OID wraparound </h4>
 \qecho <h4> over time the insert statement will be slower as the Database will be searching for an unused OID and it will have to read from the disk , you will see the insert statements is waiting on IPC:BufferiO or IO:DataFileRead  </h4>
 \qecho <h4> you can use below SQL to check the toast table  </h4>
-\qecho <h4> select COUNT(DISTINCT chunk_id),2^31 - COUNT(DISTINCT chunk_id) as remaining_OID ,ROUND(100*((2^31 - COUNT(DISTINCT chunk_id)))/2^31::float) AS remaining_OID_PCT ,ROUND(100*(COUNT(DISTINCT chunk_id)/2^31::float)) as percent_towards_Toast_oid_wraparound from pg_toast.pg_toast_{number};</h4> 
+\qecho <h4> select COUNT(DISTINCT chunk_id),2^32 - COUNT(DISTINCT chunk_id) as remaining_OID ,ROUND(100*((2^32 - COUNT(DISTINCT chunk_id)))/2^32::float) AS remaining_OID_PCT ,ROUND(100*(COUNT(DISTINCT chunk_id)/2^32::float)) as percent_towards_Toast_oid_wraparound from pg_toast.pg_toast_{number};</h4> 
 \qecho <br>
 \qecho <h4> when the toast hits the OID wraparound, you will see the following wait event LWLock:OidGen and the insert statements will fail and you will see below error in the log file </h4>
 \qecho <br>
@@ -1650,13 +2411,23 @@ select *,age(xmin) age_xmin,age(catalog_xmin) age_catalog_xmin
 from pg_replication_slots where active = false order by age(xmin) desc;
 \qecho <br>
 \qecho <h3> Note:</h3>
-\qecho <h4> RDS Postgres instance storage may get full because inactive replication slots were not removed after DMS task completed </h4>
-\qecho <h4> If replication slot is created and it becomes in-active, then transaction logs wont recycle from master instance. So eventually storage gets full </h4> 
+\qecho <h4> Inactive replication slots can cause following issues if left unmonitored: </h4>
+\qecho <ul>
+\qecho <li> They prevent WAL removal, which can fill up disk space on primary server </li>
+\qecho <li> They might indicate failed replicas or stopped replication processes </li>
+\qecho <li> They prevent VACUUM from removing dead rows that might be needed by the replication slot, leading to: </li>
+\qecho <ul>
+\qecho <li> - Table bloat </li>
+\qecho <li> - Degraded query performance </li>
+\qecho <li> - Increased disk space usage </li>
+\qecho <li> - Transaction ID wraparound risks </li>
+\qecho </ul>
+\qecho </ul>
 \qecho <h4> These replication slots can be cleaned as below </h4>
 \qecho <br>
 \qecho <h4> Drop inactive replication slot : </h4>
 \qecho <h4> Use the below SQL to Generate SQL to drop the inactive slots </h4>
-\qecho <h4>  select 'select pg_drop_replication_slot('''||slot_name||''');' from pg_replication_slots where active = false; </h4>
+\qecho <h4>  select '''select pg_drop_replication_slot('''||slot_name||''');''' from pg_replication_slots where active = false; </h4>
 \qecho <h4> then Verify the CLoudWatch metrics Free Storage Space to confirm that disk space was released </h4>
 \qecho <br>
 \qecho <h3> Replication Slot wal status :</h3> 
@@ -1680,6 +2451,28 @@ order by safe_wal_size ;
 \qecho <br>
 \qecho <h3> pg_stat_replication_slots view:</h3> 
 \qecho <h4> pg_stat_replication_slots is a statistics view showing statistics about logical replication slot usage, specifically about transactions spilled to disk from the ReorderBuffer once the memory used by logical decoding to decode changes from WAL has exceeded logical_decoding_work_mem </h4>
+\qecho <h4> logical_decoding_work_mem parameter is per replication slot , the total logical decoding work memory that can be consumed is the product of the replication slot count and the logical_decoding_work_mem value. </h4>
+\qecho <p>Important considerations:</p>
+\qecho <ul>
+\qecho <li><strong>Performance Impact:</strong> Logical spill files can significantly impact replication lag and system performance:
+\qecho   <ul>
+\qecho     <li>Increased I/O operations due to disk writes/reads of spill files</li>
+\qecho     <li>Higher CPU usage for managing spilled transactions</li>
+\qecho     <li>Potential increase in replication lag due to additional I/O operations</li>
+\qecho   </ul>
+\qecho </li>
+\qecho <li><strong>Monitoring:</strong>
+\qecho   <ul>
+\qecho     <li>For Amazon RDS/Aurora PostgreSQL: Monitor the ReplicationSlotDiskUsage metric in CloudWatch to track spill files usage</li>
+\qecho   </ul>
+\qecho </li>
+\qecho <li><strong>Documentation:</strong>
+\qecho   <ul>
+\qecho     <li>Aurora PostgreSQL tuning guidance: <a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.BestPractices.Tuning-memory-parameters.html#AuroraPostgreSQL.BestPractices.Tuning-memory-parameters.logical-decoding-work-mem">Aurora PostgreSQL Memory Parameters</a></li>
+\qecho     <li>logical_decoding_work_mem tuning guidance: <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-LOGICAL-DECODING-WORK-MEM">PostgreSQL Documentation</a></li>
+\qecho   </ul>
+\qecho </li>
+\qecho </ul>
 SELECT * FROM pg_stat_replication_slots order by spill_bytes;
 
 \qecho <h3>Replication Parameters :</h3> 
@@ -1806,20 +2599,13 @@ order by xact_duration desc, query_duration desc;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Orphaned prepared transactions</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-SELECT gid, prepared, owner, database, transaction AS xmin
+SELECT gid, prepared, now()-prepared duration, owner, database, transaction AS xmin
 FROM pg_prepared_xacts
 ORDER BY age(transaction) DESC; 
 
 \qecho <br>
 \qecho <h3> Note:</h3>
-\qecho <h4> During two-phase commit, a distributed transaction is first prepared with the PREPARE statement and then committed with the COMMIT PREPARED statement </h4>
-\qecho <h4> Once a transaction has been prepared, it is kept hanging around until it is committed or aborted. It </h4> 
-\qecho <h4> even has to survive a server restart! Normally, transactions don not remain in the prepared state for long,  </h4>
-\qecho <h4> but sometimes things go wrong and a prepared transaction has to be removed manually by an administrator.  </h4>
-\qecho <h4> any Orphaned prepared transactions will prevent the VACUUM to remove the dead rows   </h4>               
-\qecho <h4>  EXAMPLE: DETAIL:  50000 dead row versions cannot be removed yet,oldest xmin: 22300 </h4>
-\qecho <br>
-\qecho <h4>  Use the ROLLBACK PREPARED transaction_id SQL statement to  remove prepared transactions    </h4>
+\qecho <h4>The orphaned prepared transactions are likely due to failed two-phase commits. These retain transaction IDs, preventing autovacuum from freezing tuples and increasing the risk of transaction ID wraparound. They also hold locks indefinitely, blocking other sessions and persisting even after a server restart, leading to performance degradation and potential deadlocks. Resolve them using "COMMIT PREPARED <gid>;" or "ROLLBACK PREPARED <gid>;" as needed. </h4>
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
@@ -1984,6 +2770,10 @@ string_agg(event_manipulation, ',') as event,
 \qecho <a name="invalid_indexes"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Invalid indexes</b></font><hr align="left" width="460">
 \qecho <br>
+\qecho <h4> Invalid indexes are indexes that are not currently valid for queries, though they will still be updated. </h4>
+\qecho <h4> Invalid indexes take up disk space but cannot be used for queries. </h4>
+\qecho <h4> Invalid indexes typically occur when using CREATE INDEX CONCURRENTLY and the command fails or is aborted. </h4>
+\qecho <h4> To fix invalid indexes, you can drop and re-create the index or use REINDEX command </h4>
 \qecho <details>
 select count (*) as count_of_invalid_indxes from pg_index WHERE pg_index.indisvalid = false ;
 with table_info as 
@@ -2095,17 +2885,28 @@ ORDER BY 1, 3, 2;
 \qecho <a name="ssl"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>SSL</b></font><hr align="left" width="460">
 \qecho <br>
+\qecho <h4> Note: The database connections operating without SSL encryption, potentially exposes sensitive data to security risks. Non-SSL (ssl=[f]alse) connections can be vulnerable to man-in-the-middle attacks, unauthroized data access, and credential theft during transmission. It is strongly recommended to enable SSL/TLS encryption for all database connections in production environments to ensure data security and compliance with security best practices. </h4>
+\qecho <h4> Please check <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html">Using SSL with a PostgreSQL DB instance</a> documentation for additional details. </h4>
+\qecho <br>
 \qecho <details>
+\qecho <h3>SSL Configuration Parameters and Settings</h3>
 select name as "Parameter_Name" , setting as value,short_desc  from pg_settings where name like '%ssl%';
 \qecho <br>
+\qecho <h3>SSL Version: Connection Count by Protocol Version</h3>
+\qecho <h4> Note: ssl version 'NULL' indicates connections that are not using SSL encryption. </h4>
 select version as ssl_version , count (*) as "Connection_count" FROM pg_stat_ssl group by version ;
 \qecho <br>
+\qecho <h3>SSL Connection Summary: Total Count by SSL Status</h3>
+\qecho <h4> Note: ssl=f indicates the total number of connections that are not using SSL encryption. </h4>
 select ssl , count (*) as "Connection_count" FROM pg_stat_ssl group by ssl ;
 \qecho <br>
-SELECT datname as "Database_Name" ,usename as "User_Name", ssl , client_addr , application_name, backend_type
+\qecho <h3>SSL Usage by Connection: Database, User, and Client Details</h3>
+\qecho <h4> Note: ssl=f indicates connections that are not using SSL encryption. </h4>
+SELECT datname as "Database_Name" ,usename as "User_Name", ssl, backend_start, client_addr , application_name, backend_type
 FROM pg_stat_ssl
-JOIN pg_stat_activity
-ON pg_stat_ssl.pid = pg_stat_activity.pid
+JOIN pg_stat_activity AS psa
+ON pg_stat_ssl.pid = psa.pid
+WHERE psa.backend_type = 'client backend' and psa.usename != 'rdsadmin'
 order by ssl ;
 \qecho </details>
 
@@ -2365,18 +3166,61 @@ ORDER BY pg_catalog.pg_relation_size(c.conrelid) DESC;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Sequences</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-\qecho <h3>sequence wraparound:</h3>
-\qecho <h3>Sequences with less than 10% of the remain values</h3>
---sequence wraparound
-select * from 
-(
-select * ,(sec.max_value - coalesce(sec.last_value,0)) as remain_values ,round((((sec.max_value - coalesce(sec.last_value,0)::float)/sec.max_value::float) *100)::int,2) remain_values_pct from pg_sequences sec ) t
-where remain_values_pct <= 10 
-and cycle is false 
-order by remain_values_pct;
+\if :obsrv_less_remaining_sequences
+\qecho <h4> Sequences that have less than 10% remaining values need attention to prevent potential issues: </h4>
+\qecho <ul>
+\qecho <li> Running out of sequence values can cause application failures </li>
+\qecho <li> Some sequences might need to be altered to use larger ranges </li>
+\qecho </ul>
+\qecho <h4> The following sequences are identified with less than 10% remaining values: </h4>
+\qecho <details>
+
+SELECT * FROM (SELECT 
+    schemaname as Schema,
+    sequencename as Sequence_Name,
+    data_type::regtype as Data_Type,
+    last_value as Current_Value,
+    max_value as Max_Value,
+    min_value as Min_Value,
+    increment_by as Increment_By,
+    cycle,
+    cache_size,
+    max_value - last_value as remaining_values,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Limit'
+        ELSE round(((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100), 2)::text || '%'
+    END as Remaining_Percentage,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Action Needed'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 1 
+        THEN '1-CRITICAL: Less than 1% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 5 
+        THEN '2-WARNING: Less than 5% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 10 
+        THEN '3-NOTICE: Less than 10% remaining'
+        ELSE 'OK'
+    END as Status
+FROM pg_sequences) seq WHERE status not in ('OK', 'No Action Needed') Order by status;
+
+\qecho </details>
+
+\qecho <h4>Recommendations for managing low-value sequences:</h4>
+\qecho <ul>
+\qecho <li> For sequences nearing exhaustion, consider: </li>
+\qecho <ul>
+\qecho <li> - Altering the sequence to use a larger range: </li>
+\qecho <code>ALTER SEQUENCE sequence_name AS bigint;</code>
+\qecho <li> - Setting a new starting value if values are available in the negative range: </li>
+\qecho <code>ALTER SEQUENCE sequence_name RESTART WITH [new_value];</code>
+\qecho <li> - Enabling cycling if appropriate for your application: </li>
+\qecho <code>ALTER SEQUENCE sequence_name CYCLE;</code>
+\qecho </ul>
+ \else
+ \endif
 \qecho <br>
 \qecho <h3>All sequences:</h3>
 select * ,(sec.max_value - coalesce(sec.last_value,0)) as remain_values ,round((((sec.max_value - coalesce(sec.last_value,0)::float)/sec.max_value::float) *100)::int,2) remain_values_pct from pg_sequences sec order by remain_values_pct;
+
 \qecho </details>
 
 
@@ -2407,6 +3251,13 @@ select * from pg_hba_file_rules;
 
 \qecho <a name="Duplicate_indexes"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Duplicate indexes</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <h3> Note:</h3>
+\qecho <h4> Duplicate indexes can have an impact on database performance in multiple ways. Firstly, they consume additional disk space, which can lead to higher storage costs and it can lead to high numbers of LWLock:buffer_content (BufferContent) wait events . Secondly, the presence of duplicate indexes can slow down write operations, as the database must update all relevant indexes when inserting, updating, or deleting records. This "write amplification" effect can degrade overall performance. Additionally, duplicate indexes can complicate query optimization, as the query planner may need to evaluate multiple indexes that serve the same purpose, potentially resulting in suboptimal query plans. Finally, maintaining duplicate indexes adds overhead to database maintenance tasks such as VACUUM.  </h4>
+\qecho <h4> Before dropping any duplicate indexes, it is recommended to review the Index definition (DDL) of the duplicate indexes to confirm . This can be done by executing the following SQL query: </h4>
+\qecho <h4> SELECT * FROM pg_indexes WHERE indexname in  ('\''Index Name'\'','\''Index Name'\''); </h4>
+\qecho <h4> Additionally, it is advisable to check index scans for the duplicate indexes using the following query: </h4>
+\qecho <h4> SELECT * FROM pg_catalog.pg_stat_all_indexes WHERE indexrelname in ('\''Index Name'\'','\''Index Name'\''); </h4>
 \qecho <br>
 \qecho <details>
 SELECT pg_size_pretty(sum(pg_relation_size(idx))::bigint) as size,
@@ -2643,6 +3494,99 @@ select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and se
 
 \qecho <a name="DB_parameters"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB parameters</b></font><hr align="left" width="460">
+\qecho <br>
+ \if :obsrv_autovacuum_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The autovacuum parameter is disabled, Turning autovacuum off increases the table and index bloat and impacts the performance.'
+ \else
+ \endif
+
+ \if :obsrv_track_counts_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The track_counts parameter is disabled, When the track_counts parameter is turned off, the database does not collect the database activity statistics. Autovacuum requires these statistics to work correctly.'
+ \else
+ \endif
+
+
+ \if :obsrv_enable_indexonlyscan_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The enable_indexonlyscan parameter is disabled, The query planner or optimizer can not use the index-only scan plan type when it is turned off.'
+ \else
+ \endif
+
+\if :obsrv_enable_indexscan_parameter_disabled
+     \qecho <br>
+     \qecho '&#8594; The enable_indexscan parameter is disabled, The query planner or optimizer can not use the index scan plan type when it is turned off.'
+ \else
+ \endif
+
+\if :obsrv_excessive_logging_logstatement
+     \qecho <br>
+     \qecho '&#8594; The current log_statement parameter is configured to either all or mod, which generates excessive log entries. This extensive logging can negatively impact database performance. It is recommended to set the parameter to none unless detailed logging is specifically required for troubleshooting or audit purposes.'
+\else
+\endif
+
+\if :obsrv_excessive_logging_logsmindurstmt
+     \qecho <br>
+     \qecho '&#8594; The log_min_duration_statement is set to 0, causing all query durations to be logged and impacting performance. Consider setting it to -1 (disabled) or a higher value based on your monitoring requirements.'
+\else
+\endif
+
+\if :obsrv_excessive_logging_logsminmsgs
+     \qecho <br>
+     \qecho '&#8594; The log_min_messages parameter is set to a DEBUG[n] level, resulting in excessive logging that may degrade database performance. Consider changing it to the default WARNING level.'
+\else
+\endif
+
+\if :obsrv_excessive_log_stmt_stats
+     \qecho <br>
+     \qecho '&#8594; The log_statement_stats parameter is currently enabled (set to on), which generates detailed statement statistics logs. This comprehensive logging can negatively impact database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_excessive_log_parser_stats
+     \qecho <br>
+     \qecho '&#8594; The log_parser_stats parameter is currently enabled, which generates detailed parser statistics for each SQL statement. This verbose logging creates unnecessary overhead and can degrade database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_excessive_log_planner_stats
+     \qecho <br>
+     \qecho '&#8594; "The log_planner_stats parameter is currently enabled, which writes query planner performance statistics to the server log. This detailed logging creates additional overhead and can negatively impact database performance. Consider setting it to off'
+\else
+\endif
+
+\if :obsrv_excessive_log_executor_stats
+     \qecho <br>
+     \qecho '&#8594; The log_executor_stats parameter is currently enabled, which writes executor performance statistics to the server log. This detailed logging creates additional overhead and can significantly impact database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_excessive_debug_print_parse
+     \qecho <br>
+     \qecho '&#8594; The debug_print_parse parameter is currently enabled, which logs the parse tree for each query. This verbose logging can generate excessive output and significantly degrade database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_excessive_debug_print_rewritten
+     \qecho <br>
+     \qecho '&#8594; The debug_print_rewritten parameter is currently enabled, which logs the output of the query rewriter for each query. This detailed logging can produce excessive output and negatively impact database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_excessive_debug_print_plan
+     \qecho <br>
+     \qecho '&#8594; The debug_print_plan parameter is currently enabled, which logs the execution plan for each query. This detailed logging can generate excessive output and significantly impact database performance. Consider disabling it by setting the parameter to off'
+\else
+\endif
+
+\if :obsrv_synchronous_commit_parameter_disabled
+    \qecho <br>
+    \qecho '&#8594; The synchronous_commit parameter is disabled. This introduces the risk of data loss, as asynchronous commit may be lost if the database crashes before the transaction is truly committed, meaning it is flushed to the transaction log (WAL). Please check <a href="https://www.postgresql.org/docs/current/wal-async-commit.html">Asynchronous Commit</a> documentation for additional details.'
+\else
+\endif
+
+\qecho <br>
 \qecho <br>
 \qecho <details>
 SELECT *  FROM pg_settings where name not in ('rds.extensions') order by category;
@@ -3018,7 +3962,7 @@ name, sum(allocated) as allocated_size_bytes,
  group by name
  order by allocated_size_bytes desc;
 \qecho <br>
-\qecho <h3> The top 50 porcess with the highest allocated memory: </h3>
+\qecho <h3> The top 50 process with the highest allocated memory: </h3>
 \qecho <br>
 select
 pid, sum(allocated) as allocated_size_bytes ,pg_size_pretty(sum(allocated)) as allocated_size , pg_size_pretty(sum(used)) as used_size,
@@ -3028,7 +3972,7 @@ group by pid order by allocated_size_bytes desc
 limit 50;
 
 \qecho <br>
-\qecho <h3> The top 50 porcess with the highest allocated memory including process information in pg_stat_activity view: </h3>
+\qecho <h3> The top 50 process with the highest allocated memory including process information in pg_stat_activity view: </h3>
 \qecho <br>
 WITH memctx  AS
   (select
@@ -3357,7 +4301,9 @@ SELECT * FROM aurora_stat_logical_wal_cache();
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 
-
+\pset format aligned
+\r
+\o
 \echo Report Generated Successfully
 \echo Report name and location: /tmp/pg_collector_:filename.html
 \q
