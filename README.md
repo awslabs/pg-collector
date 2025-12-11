@@ -93,7 +93,9 @@ PG Collector script will generate HTML file  under [/tmp](https://tldp.org/LDP/L
 
 ## How to run PG Collector script ( pg_collector.sql )
 
-1- you need [psql](https://www.postgresql.org/docs/10/app-psql.html) to be able to connect to the postgresql DB and run the pg_collector.sql script 
+1- you need [psql](https://www.postgresql.org/docs/current/app-psql.html) to be able to connect to the postgresql DB and run the pg_collector.sql script 
+
+It is recommended that you use a psql version that matches the same server major version or higher .
 
 2- Download pg_collector.sql in your laptop or the host that want to access the database from 
 

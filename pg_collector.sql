@@ -3,8 +3,8 @@
 -- |  -- Author : Mohamed Ali                                                                                    |
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to collect PostgreSQL Database Information and generate HTML Report                |
--- |  -- version : V1.1 for PostgreSQL 17                                                                        |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-17/CHANGELOG.md    | 
+-- |  -- version : V1 for PostgreSQL 18                                                                          |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-18/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -60,8 +60,8 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 17</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-17" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 18</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-18" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -97,7 +97,25 @@ select case when pg_is_in_recovery() then 'Standby/Reader DB (Read Only)' else '
 select  now () as "Date" ,pg_postmaster_start_time() as "DB_START_DATE", current_timestamp - pg_postmaster_start_time() as "UP_TIME"  ,current_database() as "DB_connected" ,current_user USER_NAME,inet_server_port() as "DB_PORT ",version()  as "DB_Version" , setting AS block_size FROM pg_settings WHERE name = 'block_size';
 \qecho <br>
 \qecho <br>
-\l+
+SELECT
+  d.datname as "Name",
+  pg_catalog.pg_get_userbyid(d.datdba) as "Owner",
+  pg_catalog.pg_encoding_to_char(d.encoding) as "Encoding",
+  CASE d.datlocprovider WHEN 'b' THEN 'builtin' WHEN 'c' THEN 'libc' WHEN 'i' THEN 'icu' END AS "Locale Provider",
+  d.datcollate as "Collate",
+  d.datctype as "Ctype",
+  d.datlocale as "Locale",
+  d.daticurules as "ICU Rules",
+  CASE WHEN pg_catalog.array_length(d.datacl, 1) = 0 THEN '(none)' ELSE pg_catalog.array_to_string(d.datacl, E'\n') END AS "Access privileges",
+  CASE WHEN pg_catalog.has_database_privilege(d.datname, 'CONNECT')
+       THEN pg_catalog.pg_size_pretty(pg_catalog.pg_database_size(d.datname))
+       ELSE 'No Access'
+  END as "Size",
+  t.spcname as "Tablespace",
+  pg_catalog.shobj_description(d.oid, 'pg_database') as "Description"
+FROM pg_catalog.pg_database d
+  JOIN pg_catalog.pg_tablespace t on d.dattablespace = t.oid
+ORDER BY 1;
 \qecho <br>
 select * from pg_database; 
 \qecho <br>
@@ -1801,10 +1819,23 @@ order by shared_blks_read desc limit 20;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Users & Roles Info</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-\du
+SELECT r.oid,r.rolname, r.rolsuper, r.rolinherit,
+  r.rolcreaterole, r.rolcreatedb, r.rolcanlogin,
+  r.rolconnlimit, r.rolvaliduntil
+, r.rolreplication
+, r.rolbypassrls
+, r.rolconfig 
+FROM pg_catalog.pg_roles r
+WHERE r.rolname !~ '^pg_'
+ORDER BY 1;
 \qecho <br>
 -- list of per database role settings (settings set at the role level)
-\drds
+SELECT rolname AS "Role", datname AS "Database",
+pg_catalog.array_to_string(setconfig, E'\n') AS "Settings"
+FROM pg_catalog.pg_db_role_setting s
+LEFT JOIN pg_catalog.pg_database d ON d.oid = setdatabase
+LEFT JOIN pg_catalog.pg_roles r ON r.oid = setrole
+ORDER BY 1, 2;
 \qecho <br>
 select * FROM pg_user;
 \qecho <br>
@@ -1838,7 +1869,29 @@ ORDER BY 1, 2, 4;
 \qecho <h3>List of schemas:</h3>
 \qecho <br>
 \qecho <details>
-\dn+
+SELECT n.nspname AS "Name",
+  pg_catalog.pg_get_userbyid(n.nspowner) AS "Owner",
+  CASE WHEN pg_catalog.array_length(n.nspacl, 1) = 0 THEN '(none)' ELSE pg_catalog.array_to_string(n.nspacl, E'\n') END AS "Access privileges",
+  pg_catalog.obj_description(n.oid, 'pg_namespace') AS "Description"
+FROM pg_catalog.pg_namespace n
+WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+ORDER BY 1;
+\qecho </details>
+\qecho <br>
+\qecho <h3>Schema size:</h3>
+\qecho <br>
+\qecho <details>
+SELECT
+    nspname AS schema_name,
+    pg_size_pretty(SUM(pg_total_relation_size(c.oid))) AS size
+FROM
+    pg_catalog.pg_class c
+LEFT JOIN
+    pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+
+GROUP BY
+    nspname
+ORDER BY 2 ;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Total objects Count in the database:</h3>
@@ -1945,23 +1998,23 @@ order by 1,2,4;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Tablespaces Info</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
-SELECT spcname as Tablespace_Name,
-  pg_catalog.pg_get_userbyid(spcowner) as Owner,
+SELECT spcname as Tablespace_Name,pg_size_pretty(pg_tablespace_size (spcname )) as Tablespace_size,
+pg_catalog.pg_get_userbyid(spcowner) as Owner,
 CASE
-WHEN 
+WHEN
 pg_tablespace_location(oid)=''
-AND     spcname='pg_default'
+AND spcname='pg_default'
 THEN
 current_setting('data_directory')||'/base/'
-WHEN 
+WHEN
 pg_tablespace_location(oid)=''
-AND     spcname='pg_global'
+AND spcname='pg_global'
 THEN
 current_setting('data_directory')||'/global/'
 ELSE
 pg_tablespace_location(oid)
 END
-AS      location          ,
+AS location ,
 spcacl,spcoptions
 FROM pg_catalog.pg_tablespace
 ORDER BY 1;
@@ -3144,8 +3197,21 @@ group by 1  order by 2 desc;
 
 \qecho <br>
 \qecho <h3>pg_largeobject_metadata table size: </h3>
-\dt+ pg_largeobject_metadata;
-
+SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "Type",
+  pg_catalog.pg_get_userbyid(c.relowner) as "Owner",
+  CASE c.relpersistence WHEN 'p' THEN 'permanent' WHEN 't' THEN 'temporary' WHEN 'u' THEN 'unlogged' END as "Persistence",
+  am.amname as "Access method",
+  pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.oid)) as "Size",
+  pg_catalog.obj_description(c.oid, 'pg_class') as "Description"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+WHERE c.relkind IN ('r','p','t','s','')
+  AND c.relname OPERATOR(pg_catalog.~) '^(pg_largeobject_metadata)$' COLLATE pg_catalog.default
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1,2;
 \qecho <br>
 --select count(*)  from pg_largeobject;
 -- in RDS PG : ERROR:  permission denied for table pg_largeobject
@@ -3155,7 +3221,21 @@ group by 1  order by 2 desc;
 \qecho <h4>Each large object is broken into segments or pages small enough to be conveniently stored as rows in pg_largeobject. </h4>
 \qecho <h4>The amount of data per page is defined to be LOBLKSIZE (which is currently BLCKSZ/4, or typically 2 kB)</h4>
 \qecho <br>
-\dt+ pg_largeobject;
+SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "Type",
+  pg_catalog.pg_get_userbyid(c.relowner) as "Owner",
+  CASE c.relpersistence WHEN 'p' THEN 'permanent' WHEN 't' THEN 'temporary' WHEN 'u' THEN 'unlogged' END as "Persistence",
+  am.amname as "Access method",
+  pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.oid)) as "Size",
+  pg_catalog.obj_description(c.oid, 'pg_class') as "Description"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+WHERE c.relkind IN ('r','p','t','s','')
+  AND c.relname OPERATOR(pg_catalog.~) '^(pg_largeobject)$' COLLATE pg_catalog.default
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1,2;
 \qecho </details>
 
 
