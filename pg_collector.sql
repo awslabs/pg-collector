@@ -168,6 +168,12 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#triggers">Triggers</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_config">pg_config</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Invalid_databases">Invalid databases</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Extended_statistics">Extended statistics</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Statistics_target">Statistics target</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
 \qecho </table>
@@ -3595,15 +3601,53 @@ SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
 
 
 -- +----------------------------------------------------------------------------+
--- |      - *************                                    -                  |
+-- |      - Extended_statistics                              -                  |
 -- +----------------------------------------------------------------------------+
 
 
-\qecho <a name="-----"></a>
-\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>*****</b></font><hr align="left" width="460">
+\qecho <a name="Extended_statistics"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Extended statistics</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
--- sql
+\qecho <h3>Extended statistics count:</h3>
+SELECT count(*) FROM pg_statistic_ext;
+\qecho <br>
+\qecho <h3>Extended statistics details:</h3>
+SELECT 
+    stxrelid::regclass AS table_name,
+    stxname AS statistics_name,
+    (SELECT array_agg(attname) 
+     FROM pg_attribute 
+     WHERE attrelid = stxrelid 
+       AND attnum = ANY(stxkeys)) AS column_names
+FROM pg_statistic_ext;
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+
+-- +----------------------------------------------------------------------------+
+-- |      - Statistics_target                                -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Statistics_target"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Statistics target</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+\qecho <h3>Default statistics target:</h3>
+SELECT name, setting FROM pg_settings WHERE name = 'default_statistics_target';
+\qecho <br>
+\qecho <h3>Tables/columns with non-default statistics target:</h3>
+SELECT
+    c.relname AS table_name,
+    a.attname AS column_name,
+    a.attstattarget AS statistics_target
+FROM pg_attribute a
+JOIN pg_class c ON a.attrelid = c.oid
+JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE a.attstattarget > 0
+  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+ORDER BY 1, 2;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
