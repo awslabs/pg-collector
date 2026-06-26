@@ -1,5 +1,17 @@
 # PG Collector  <img src="img/pg_collector_logo.png" align="right" alt="">
 
+## Table of Contents
+- [Overview](#overview)
+- [PG Collector's Automated Database Health check](#pg-collectors-automated-database-health-check)
+- [PG Collector report header](#pg-collector-report-header)
+- [Example of PG Collector report](#example-of-pg-collector-report)
+- [PG Collector output](#pg-collector-output)
+- [How to run PG Collector script](#how-to-run-pg-collector-script--pg_collectorsql-)
+- [Selective Section Execution](#selective-section-execution)
+- [PG Collector & AI](#pg-collector--ai)
+- [Notes](#notes)
+- [License](#license)
+
 ## Overview
 
 PG Collector for [Postgresql](https://www.postgresql.org/) is a sql script that gathers valuable database information and presents it in a consolidated HTML file which provides a convenient way to view and navigate between different sections of the report.
@@ -55,6 +67,7 @@ Database Health check list :
    17- Inactive replication slots
    18- Logical replication spill files
    19- Outdated Extensions
+   20- Parameters pending restart
 ```
 ### Example of The Observations section
 
@@ -87,7 +100,16 @@ Example : pg_collector_testdb-2020-10-10_030920.html
 
 
 ### Report location: 
-PG Collector script will generate HTML file  under [/tmp](https://tldp.org/LDP/Linux-Filesystem-Hierarchy/html/tmp.html) directory. 
+PG Collector generates the HTML report under [/tmp](https://tldp.org/LDP/Linux-Filesystem-Hierarchy/html/tmp.html) by default.
+
+To save the report to a different location, pass `-v outdir=/your/path`:
+
+```bash
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v outdir=/home/user/reports -f pg_collector.sql
+```
+
+> **Note:** The output directory must already exist before running the script. PG Collector will not create it automatically.
+> If the directory does not exist, psql cannot open the output file and the HTML report will be printed to the terminal screen instead of saved to a file.
 
 
 
@@ -139,6 +161,171 @@ mohamed@mydevhost ~ %ls -lhrt /tmp/pg_collector_*
 5-  open the report using any internet browser
 
 
+## Selective Section Execution 
+
+PG Collector supports running a specific sections of the report instead of the full report. This is useful for:
+
+- Quick focused troubleshooting (e.g., check vacuum stats only or Observations (Health checks))
+- Large databases where a full report takes too long
+- Targeted Aurora or Limitless diagnostics
+
+### List Available Sections
+
+```bash
+psql -v help=t -f pg_collector.sql
+```
+
+Output:
+```
+PG Collector - Available Sections:
+
+  Variable Name        Description
+  ---------------      ----------------------------------------
+  observations    - Observations (Health checks)
+  db_size         - Database size
+  txid            - Transaction ID TXID (Wraparound)
+  table_size      - Table Size
+  index_size      - Index Size
+  vacuum          - Vacuum & Statistics
+  extensions      - Extensions
+  memory          - Memory setting
+  pgss            - pg_stat_statements extension
+  users           - Users & Roles Info
+  schema          - Schema Info
+  tablespaces     - Tablespaces Info
+  table_access    - Table Access Profile
+  unused_idx      - Unused Indexes
+  index_access    - Index Access Profile
+  bloat           - Fragmentation (Bloat)
+  toast           - Toast Tables Mapping
+  replication     - Replication
+  sessions        - Sessions/Connections Info
+  prepared_txn    - Orphaned prepared transactions
+  pk_fk           - PK or FK using numeric/integer
+  public_schema   - public Schema
+  invalid_idx     - Invalid indexes
+  privileges      - Access privileges
+  default_privileges - Default access privileges
+  pgaudit         - pgaudit extension
+  unlogged_tables - Unlogged Tables
+  ssl             - SSL
+  bg_processes    - Background processes
+  mxid            - Multixact ID MXID
+  temp            - Temp Tables & Files
+  large_objects   - Large objects
+  partitions      - Partition tables
+  sequences       - Sequences
+  pg_hba          - pg_hba.conf
+  dup_idx         - Duplicate indexes
+  functions       - Functions statistics
+  db_load         - DB Load
+  triggers        - Triggers
+  pg_config       - pg_config
+  db_params       - DB parameters
+  copy_progress   - COPY command progress
+  idx_progress    - Index Creation Progress
+  invalid_db      - Invalid databases
+  mat_views       - Materialized Views
+  foreign_servers - Foreign Servers
+  pg_shdepend     - pg_shdepend (shared object dependencies)
+  fk_no_index     - FK without index
+
+  ---------- Aurora PostgreSQL ----------
+  aurora_version          - Aurora version
+  aurora_builtins         - Aurora built-in functions
+  aurora_instance_id      - Aurora db instance identifier
+  aurora_cluster          - Aurora cluster instances
+  aurora_replica_lag      - Aurora reader instances - Replica Lag
+  aurora_ccm              - Aurora cluster cache management (CCM)
+  aurora_global_db        - Aurora global db status
+  aurora_wait_events      - Aurora wait event stat
+  aurora_qpm              - Query Plan Management (QPM)
+  aurora_dml              - Aurora DML activity
+  aurora_memctx           - Process memory context usage
+  aurora_stat_stmt        - Aurora_stat_statements
+  aurora_stat_plans       - Aurora_stat_plans
+  aurora_wal_cache        - Logical replication write-through cache
+
+  ---------- Aurora Limitless ----------
+  limitless_routers       - Routers & Shards Info
+  limitless_params        - Limitless parameters
+  limitless_databases     - Limitless databases
+  limitless_extensions    - Limitless Extensions
+  limitless_txid          - Limitless Transaction ID TXID
+  limitless_tables        - Limitless Tables
+  limitless_stat_stmt     - limitless_stat_statements
+  limitless_msq           - Multi shard queries (MSQ)
+  limitless_sso           - Single Shard Optimized (SSO)
+  limitless_sessions      - Limitless Sessions/Connections
+  limitless_dist_sess     - Distributed sessions info
+  limitless_wait_events   - Limitless Database Load (Wait events)
+```
+
+### Run Specific Sections
+
+Pass `-v fullmod=f` to enable selective mode, then `-v <section>=t` for each section you want:
+
+```bash
+# Vacuum & Statistics only
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v fullmod=f -v vacuum=t -f pg_collector.sql
+
+# Vacuum and Replication together
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v fullmod=f -v vacuum=t -v replication=t -f pg_collector.sql
+
+# Observations (Health checks)
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v fullmod=f -v observations=t -f pg_collector.sql
+
+# Size analysis
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v fullmod=f -v db_size=t -v table_size=t -v index_size=t -f pg_collector.sql
+
+# Aurora QPM section
+psql -h [hostname] -p [port] -d [dbname] -U [user] -v fullmod=f -v aurora_qpm=t -f pg_collector.sql
+```
+
+### Full Report (Default)
+
+No extra variables needed — works exactly as before:
+
+```bash
+psql -h [hostname] -p [port] -d [dbname] -U [user] -f pg_collector.sql
+```
+
+### Terminal Output in Selective Mode
+
+```
+SET
+statement_timeout set to 5 minutes. To change, edit the SET statement_timeout line in the script.
+Output format is html.
+Generating specific sections in the Report:
+  - Vacuum & Statistics
+  - Replication
+Output format is aligned.
+Query buffer reset (cleared).
+Report Generated Successfully
+Report name and location: /tmp/pg_collector_mydb-2026-06-15_111308.html
+```
+
+The HTML report header will show a "Partial Report" banner listing the included sections with clickable links. The DB INFO header (version, uptime, host) always runs regardless of mode.
+
+> **Note:** Only the value `t` enables a section. Any other value (`f`, `0`, or not set) skips the section.
+
+## PG Collector & AI
+
+PG Collector HTML reports are designed for humans — beautiful tables, clickable navigation, everything formatted nicely. But when feeding reports into an AI model, all that HTML markup translates to a lot of unnecessary tokens.
+
+### Convert HTML → Markdown
+
+Use [Pandoc](https://pandoc.org/installing.html) to strip the HTML markup and retain only the structured data. This reduces token consumption by ~70% vs raw HTML, making AI analysis significantly faster and cheaper.
+
+```bash
+pandoc pg_collector_report.html -f html -t markdown -o pg_collector_report.md
+```
+
+Example:
+
+```bash
+pandoc pg_collector_postgres-2026-02-13_053714.html -f html -t markdown -o pg_collector_postgres-2026-02-13_053714.md
+```
 
 ## Notes:
 1- it is ok to see below errors while executing the pg_collector.sql script if you did not install pg_stat_statements extension
@@ -162,20 +349,19 @@ LINE 10: from pg_stat_statements
 postgres=> \q
 ```
 
-2- if the Database have Tens of thousands of tables , some queries can take longer time .
-use statement_timeout to Abort any statement that takes more than the specified number of milliseconds.
-please check below example .  
-
+2- If the database has tens of thousands of tables, some queries can take longer time.
+The script sets `statement_timeout = 5 minutes` by default to prevent any single query from hanging indefinitely.
+If a query exceeds 5 minutes, it will be cancelled and the script will continue to the next section.
+To change the default timeout, edit the `SET statement_timeout` line at the top of the pg_collector.sql script.
 
 ```
-postgres=> set statement_timeout=30000;
 SET
-postgres=> \i pg_collector.sql
+statement_timeout set to 5 minutes. To change, edit the SET statement_timeout line in the script.
 Output format is html.
-Report name and location: /tmp/pg_collector_postgres-2021-07-22_194944.html
-psql:pg_collector.sql:1442: ERROR:  canceling statement due to statement timeout
-postgres=>
-
+Output format is aligned.
+Query buffer reset (cleared).
+Report Generated Successfully
+Report name and location: /tmp/pg_collector_testdb-2026-06-11_223030.html
 ```
 
 
