@@ -3,14 +3,285 @@
 -- |  -- Author : Mohamed Ali                                                                                    |
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to collect PostgreSQL Database Information and generate HTML Report                |
--- |  -- version : V1.4 for PostgreSQL 13                                                                        |
+-- |  -- version : V1.5 for PostgreSQL 13                                                                        |
 -- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-13/CHANGELOG.md    |    
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
+-- +-------------------------------------------------------------------------------------------------------------+
+-- | Selective Section Execution                                                                                 |
+-- | Usage: psql -v fullmod=f -v vacuum=t -v replication=t -f pg_collector.sql                                   |
+-- | Help:  psql -v help=t -f pg_collector.sql                                                                   |
+-- +-------------------------------------------------------------------------------------------------------------+
+\set help :help
+SELECT CASE WHEN :'help' = ':help' THEN 'f' ELSE :'help' END AS "help" \gset
+\if :help
+\echo ''
+\echo 'PG Collector - Available Sections:'
+\echo ''
+\echo '  Variable Name     Description'
+\echo '  -------------     -----------'  
+\echo '  observations    - Observations (Health checks)'
+\echo '  db_size         - Database size'
+\echo '  txid            - Transaction ID TXID (Wraparound)'
+\echo '  table_size      - Table Size'
+\echo '  index_size      - Index Size'
+\echo '  vacuum          - Vacuum & Statistics'
+\echo '  extensions      - Extensions'
+\echo '  memory          - Memory setting'
+\echo '  pgss            - pg_stat_statements extension'
+\echo '  users           - Users & Roles Info'
+\echo '  schema          - Schema Info'
+\echo '  tablespaces     - Tablespaces Info'
+\echo '  table_access    - Table Access Profile'
+\echo '  unused_idx      - Unused Indexes'
+\echo '  index_access    - Index Access Profile'
+\echo '  bloat           - Fragmentation (Bloat)'
+\echo '  toast           - Toast Tables Mapping'
+\echo '  replication     - Replication'
+\echo '  sessions        - Sessions/Connections Info'
+\echo '  prepared_txn    - Orphaned prepared transactions'
+\echo '  pk_fk           - PK or FK using numeric/integer'
+\echo '  public_schema   - public Schema'
+\echo '  invalid_idx     - Invalid indexes'
+\echo '  privileges      - Access privileges'
+\echo '  default_privileges - Default access privileges'
+\echo '  pgaudit         - pgaudit extension'
+\echo '  unlogged_tables - Unlogged Tables'
+\echo '  ssl             - SSL'
+\echo '  bg_processes    - Background processes'
+\echo '  mxid            - Multixact ID MXID'
+\echo '  temp            - Temp tables'
+\echo '  large_objects   - Large objects'
+\echo '  partitions      - Partition tables'
+\echo '  sequences       - Sequences'
+\echo '  pg_hba          - pg_hba.conf'
+\echo '  dup_idx         - Duplicate indexes'
+\echo '  functions       - Functions statistics'
+\echo '  db_load         - DB Load'
+\echo '  triggers        - Triggers'
+\echo '  pg_config       - pg_config'
+\echo '  db_params       - DB parameters'
+\echo '  idx_progress    - Index Creation Progress'
+\echo '  invalid_db      - Invalid databases'
+\echo '  mat_views       - Materialized Views'
+\echo '  foreign_servers - Foreign Servers'
+\echo '  pg_shdepend     - pg_shdepend (shared object dependencies)'
+\echo '  fk_no_index     - FK without index'
+\echo ''
+\echo '  ---------- Aurora PostgreSQL ----------'
+\echo '  aurora_version          - Aurora version'
+\echo '  aurora_builtins         - Aurora built-in functions'
+\echo '  aurora_instance_id      - Aurora db instance identifier'
+\echo '  aurora_cluster          - Aurora cluster instances'
+\echo '  aurora_replica_lag      - Aurora reader instances - Replica Lag'
+\echo '  aurora_ccm              - Aurora cluster cache management (CCM)'
+\echo '  aurora_global_db        - Aurora global db status'
+\echo '  aurora_wait_events      - Aurora wait event stat'
+\echo '  aurora_qpm              - Query Plan Management (QPM)'
+\echo '  aurora_dml              - Aurora DML activity'
+\echo '  aurora_memctx           - Process memory context usage'
+\echo '  aurora_wal_cache        - Logical replication write-through cache'
+\echo ''
+\echo ''
+\echo 'Usage:'
+\echo '  psql -v fullmod=f -v vacuum=t -v replication=t -f pg_collector.sql'
+\echo '  psql -f pg_collector.sql   (runs all sections - default)'
+\echo ''
+\quit
+\endif
+SET statement_timeout = '5min';
+\echo 'statement_timeout set to 5 minutes. To change, edit the SET statement_timeout line in the script.'
+-- Resolve fullmod: default 't' (full mode) if not passed
+\set fullmod :fullmod
+SELECT CASE WHEN :'fullmod' = ':fullmod' THEN 't' ELSE :'fullmod' END AS "fullmod" \gset
+-- Resolve section variables
+\set observations :observations
+SELECT CASE WHEN :'observations' = ':observations' THEN 'f' ELSE :'observations' END AS "observations" \gset
+\set db_size :db_size
+SELECT CASE WHEN :'db_size' = ':db_size' THEN 'f' ELSE :'db_size' END AS "db_size" \gset
+\set txid :txid
+SELECT CASE WHEN :'txid' = ':txid' THEN 'f' ELSE :'txid' END AS "txid" \gset
+\set table_size :table_size
+SELECT CASE WHEN :'table_size' = ':table_size' THEN 'f' ELSE :'table_size' END AS "table_size" \gset
+\set index_size :index_size
+SELECT CASE WHEN :'index_size' = ':index_size' THEN 'f' ELSE :'index_size' END AS "index_size" \gset
+\set vacuum :vacuum
+SELECT CASE WHEN :'vacuum' = ':vacuum' THEN 'f' ELSE :'vacuum' END AS "vacuum" \gset
+\set extensions :extensions
+SELECT CASE WHEN :'extensions' = ':extensions' THEN 'f' ELSE :'extensions' END AS "extensions" \gset
+\set memory :memory
+SELECT CASE WHEN :'memory' = ':memory' THEN 'f' ELSE :'memory' END AS "memory" \gset
+\set pgss :pgss
+SELECT CASE WHEN :'pgss' = ':pgss' THEN 'f' ELSE :'pgss' END AS "pgss" \gset
+\set users :users
+SELECT CASE WHEN :'users' = ':users' THEN 'f' ELSE :'users' END AS "users" \gset
+\set schema :schema
+SELECT CASE WHEN :'schema' = ':schema' THEN 'f' ELSE :'schema' END AS "schema" \gset
+\set tablespaces :tablespaces
+SELECT CASE WHEN :'tablespaces' = ':tablespaces' THEN 'f' ELSE :'tablespaces' END AS "tablespaces" \gset
+\set table_access :table_access
+SELECT CASE WHEN :'table_access' = ':table_access' THEN 'f' ELSE :'table_access' END AS "table_access" \gset
+\set unused_idx :unused_idx
+SELECT CASE WHEN :'unused_idx' = ':unused_idx' THEN 'f' ELSE :'unused_idx' END AS "unused_idx" \gset
+\set index_access :index_access
+SELECT CASE WHEN :'index_access' = ':index_access' THEN 'f' ELSE :'index_access' END AS "index_access" \gset
+\set bloat :bloat
+SELECT CASE WHEN :'bloat' = ':bloat' THEN 'f' ELSE :'bloat' END AS "bloat" \gset
+\set toast :toast
+SELECT CASE WHEN :'toast' = ':toast' THEN 'f' ELSE :'toast' END AS "toast" \gset
+\set replication :replication
+SELECT CASE WHEN :'replication' = ':replication' THEN 'f' ELSE :'replication' END AS "replication" \gset
+\set sessions :sessions
+SELECT CASE WHEN :'sessions' = ':sessions' THEN 'f' ELSE :'sessions' END AS "sessions" \gset
+\set prepared_txn :prepared_txn
+SELECT CASE WHEN :'prepared_txn' = ':prepared_txn' THEN 'f' ELSE :'prepared_txn' END AS "prepared_txn" \gset
+\set pk_fk :pk_fk
+SELECT CASE WHEN :'pk_fk' = ':pk_fk' THEN 'f' ELSE :'pk_fk' END AS "pk_fk" \gset
+\set public_schema :public_schema
+SELECT CASE WHEN :'public_schema' = ':public_schema' THEN 'f' ELSE :'public_schema' END AS "public_schema" \gset
+\set invalid_idx :invalid_idx
+SELECT CASE WHEN :'invalid_idx' = ':invalid_idx' THEN 'f' ELSE :'invalid_idx' END AS "invalid_idx" \gset
+\set privileges :privileges
+SELECT CASE WHEN :'privileges' = ':privileges' THEN 'f' ELSE :'privileges' END AS "privileges" \gset
+\set default_privileges :default_privileges
+SELECT CASE WHEN :'default_privileges' = ':default_privileges' THEN 'f' ELSE :'default_privileges' END AS "default_privileges" \gset
+\set pgaudit :pgaudit
+SELECT CASE WHEN :'pgaudit' = ':pgaudit' THEN 'f' ELSE :'pgaudit' END AS "pgaudit" \gset
+\set unlogged_tables :unlogged_tables
+SELECT CASE WHEN :'unlogged_tables' = ':unlogged_tables' THEN 'f' ELSE :'unlogged_tables' END AS "unlogged_tables" \gset
+\set ssl :ssl
+SELECT CASE WHEN :'ssl' = ':ssl' THEN 'f' ELSE :'ssl' END AS "ssl" \gset
+\set bg_processes :bg_processes
+SELECT CASE WHEN :'bg_processes' = ':bg_processes' THEN 'f' ELSE :'bg_processes' END AS "bg_processes" \gset
+\set mxid :mxid
+SELECT CASE WHEN :'mxid' = ':mxid' THEN 'f' ELSE :'mxid' END AS "mxid" \gset
+\set temp :temp
+SELECT CASE WHEN :'temp' = ':temp' THEN 'f' ELSE :'temp' END AS "temp" \gset
+\set large_objects :large_objects
+SELECT CASE WHEN :'large_objects' = ':large_objects' THEN 'f' ELSE :'large_objects' END AS "large_objects" \gset
+\set partitions :partitions
+SELECT CASE WHEN :'partitions' = ':partitions' THEN 'f' ELSE :'partitions' END AS "partitions" \gset
+\set pg_shdepend :pg_shdepend
+SELECT CASE WHEN :'pg_shdepend' = ':pg_shdepend' THEN 'f' ELSE :'pg_shdepend' END AS "pg_shdepend" \gset
+\set fk_no_index :fk_no_index
+SELECT CASE WHEN :'fk_no_index' = ':fk_no_index' THEN 'f' ELSE :'fk_no_index' END AS "fk_no_index" \gset
+\set sequences :sequences
+SELECT CASE WHEN :'sequences' = ':sequences' THEN 'f' ELSE :'sequences' END AS "sequences" \gset
+\set pg_hba :pg_hba
+SELECT CASE WHEN :'pg_hba' = ':pg_hba' THEN 'f' ELSE :'pg_hba' END AS "pg_hba" \gset
+\set dup_idx :dup_idx
+SELECT CASE WHEN :'dup_idx' = ':dup_idx' THEN 'f' ELSE :'dup_idx' END AS "dup_idx" \gset
+\set functions :functions
+SELECT CASE WHEN :'functions' = ':functions' THEN 'f' ELSE :'functions' END AS "functions" \gset
+\set db_load :db_load
+SELECT CASE WHEN :'db_load' = ':db_load' THEN 'f' ELSE :'db_load' END AS "db_load" \gset
+\set triggers :triggers
+SELECT CASE WHEN :'triggers' = ':triggers' THEN 'f' ELSE :'triggers' END AS "triggers" \gset
+\set pg_config :pg_config
+SELECT CASE WHEN :'pg_config' = ':pg_config' THEN 'f' ELSE :'pg_config' END AS "pg_config" \gset
+\set db_params :db_params
+SELECT CASE WHEN :'db_params' = ':db_params' THEN 'f' ELSE :'db_params' END AS "db_params" \gset
+\set idx_progress :idx_progress
+SELECT CASE WHEN :'idx_progress' = ':idx_progress' THEN 'f' ELSE :'idx_progress' END AS "idx_progress" \gset
+\set invalid_db :invalid_db
+SELECT CASE WHEN :'invalid_db' = ':invalid_db' THEN 'f' ELSE :'invalid_db' END AS "invalid_db" \gset
+\set mat_views :mat_views
+SELECT CASE WHEN :'mat_views' = ':mat_views' THEN 'f' ELSE :'mat_views' END AS "mat_views" \gset
+\set foreign_servers :foreign_servers
+SELECT CASE WHEN :'foreign_servers' = ':foreign_servers' THEN 'f' ELSE :'foreign_servers' END AS "foreign_servers" \gset
+-- Compute do_ flags
+SELECT CASE WHEN :'fullmod' = 't' OR :'observations' = 't' THEN 't' ELSE 'f' END AS "do_observations" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'db_size' = 't' THEN 't' ELSE 'f' END AS "do_db_size" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'txid' = 't' THEN 't' ELSE 'f' END AS "do_txid" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'table_size' = 't' THEN 't' ELSE 'f' END AS "do_table_size" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'index_size' = 't' THEN 't' ELSE 'f' END AS "do_index_size" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'vacuum' = 't' THEN 't' ELSE 'f' END AS "do_vacuum" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'extensions' = 't' THEN 't' ELSE 'f' END AS "do_extensions" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'memory' = 't' THEN 't' ELSE 'f' END AS "do_memory" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pgss' = 't' THEN 't' ELSE 'f' END AS "do_pgss" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'users' = 't' THEN 't' ELSE 'f' END AS "do_users" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'schema' = 't' THEN 't' ELSE 'f' END AS "do_schema" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'tablespaces' = 't' THEN 't' ELSE 'f' END AS "do_tablespaces" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'table_access' = 't' THEN 't' ELSE 'f' END AS "do_table_access" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'unused_idx' = 't' THEN 't' ELSE 'f' END AS "do_unused_idx" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'index_access' = 't' THEN 't' ELSE 'f' END AS "do_index_access" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'bloat' = 't' THEN 't' ELSE 'f' END AS "do_bloat" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'toast' = 't' THEN 't' ELSE 'f' END AS "do_toast" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'replication' = 't' THEN 't' ELSE 'f' END AS "do_replication" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'sessions' = 't' THEN 't' ELSE 'f' END AS "do_sessions" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'prepared_txn' = 't' THEN 't' ELSE 'f' END AS "do_prepared_txn" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pk_fk' = 't' THEN 't' ELSE 'f' END AS "do_pk_fk" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'public_schema' = 't' THEN 't' ELSE 'f' END AS "do_public_schema" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'invalid_idx' = 't' THEN 't' ELSE 'f' END AS "do_invalid_idx" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'privileges' = 't' THEN 't' ELSE 'f' END AS "do_privileges" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'default_privileges' = 't' THEN 't' ELSE 'f' END AS "do_default_privileges" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pgaudit' = 't' THEN 't' ELSE 'f' END AS "do_pgaudit" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'unlogged_tables' = 't' THEN 't' ELSE 'f' END AS "do_unlogged_tables" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'ssl' = 't' THEN 't' ELSE 'f' END AS "do_ssl" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'bg_processes' = 't' THEN 't' ELSE 'f' END AS "do_bg_processes" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'mxid' = 't' THEN 't' ELSE 'f' END AS "do_mxid" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'temp' = 't' THEN 't' ELSE 'f' END AS "do_temp" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'large_objects' = 't' THEN 't' ELSE 'f' END AS "do_large_objects" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'partitions' = 't' THEN 't' ELSE 'f' END AS "do_partitions" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pg_shdepend' = 't' THEN 't' ELSE 'f' END AS "do_pg_shdepend" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'fk_no_index' = 't' THEN 't' ELSE 'f' END AS "do_fk_no_index" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'sequences' = 't' THEN 't' ELSE 'f' END AS "do_sequences" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pg_hba' = 't' THEN 't' ELSE 'f' END AS "do_pg_hba" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'dup_idx' = 't' THEN 't' ELSE 'f' END AS "do_dup_idx" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'functions' = 't' THEN 't' ELSE 'f' END AS "do_functions" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'db_load' = 't' THEN 't' ELSE 'f' END AS "do_db_load" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'triggers' = 't' THEN 't' ELSE 'f' END AS "do_triggers" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'pg_config' = 't' THEN 't' ELSE 'f' END AS "do_pg_config" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'db_params' = 't' THEN 't' ELSE 'f' END AS "do_db_params" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'idx_progress' = 't' THEN 't' ELSE 'f' END AS "do_idx_progress" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'invalid_db' = 't' THEN 't' ELSE 'f' END AS "do_invalid_db" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'mat_views' = 't' THEN 't' ELSE 'f' END AS "do_mat_views" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'foreign_servers' = 't' THEN 't' ELSE 'f' END AS "do_foreign_servers" \gset
+-- Resolve Aurora sub-section variables
+\set aurora_version :aurora_version
+SELECT CASE WHEN :'aurora_version' = ':aurora_version' THEN 'f' ELSE :'aurora_version' END AS "aurora_version" \gset
+\set aurora_builtins :aurora_builtins
+SELECT CASE WHEN :'aurora_builtins' = ':aurora_builtins' THEN 'f' ELSE :'aurora_builtins' END AS "aurora_builtins" \gset
+\set aurora_instance_id :aurora_instance_id
+SELECT CASE WHEN :'aurora_instance_id' = ':aurora_instance_id' THEN 'f' ELSE :'aurora_instance_id' END AS "aurora_instance_id" \gset
+\set aurora_cluster :aurora_cluster
+SELECT CASE WHEN :'aurora_cluster' = ':aurora_cluster' THEN 'f' ELSE :'aurora_cluster' END AS "aurora_cluster" \gset
+\set aurora_replica_lag :aurora_replica_lag
+SELECT CASE WHEN :'aurora_replica_lag' = ':aurora_replica_lag' THEN 'f' ELSE :'aurora_replica_lag' END AS "aurora_replica_lag" \gset
+\set aurora_ccm :aurora_ccm
+SELECT CASE WHEN :'aurora_ccm' = ':aurora_ccm' THEN 'f' ELSE :'aurora_ccm' END AS "aurora_ccm" \gset
+\set aurora_global_db :aurora_global_db
+SELECT CASE WHEN :'aurora_global_db' = ':aurora_global_db' THEN 'f' ELSE :'aurora_global_db' END AS "aurora_global_db" \gset
+\set aurora_wait_events :aurora_wait_events
+SELECT CASE WHEN :'aurora_wait_events' = ':aurora_wait_events' THEN 'f' ELSE :'aurora_wait_events' END AS "aurora_wait_events" \gset
+\set aurora_qpm :aurora_qpm
+SELECT CASE WHEN :'aurora_qpm' = ':aurora_qpm' THEN 'f' ELSE :'aurora_qpm' END AS "aurora_qpm" \gset
+\set aurora_dml :aurora_dml
+SELECT CASE WHEN :'aurora_dml' = ':aurora_dml' THEN 'f' ELSE :'aurora_dml' END AS "aurora_dml" \gset
+\set aurora_memctx :aurora_memctx
+SELECT CASE WHEN :'aurora_memctx' = ':aurora_memctx' THEN 'f' ELSE :'aurora_memctx' END AS "aurora_memctx" \gset
+\set aurora_wal_cache :aurora_wal_cache
+SELECT CASE WHEN :'aurora_wal_cache' = ':aurora_wal_cache' THEN 'f' ELSE :'aurora_wal_cache' END AS "aurora_wal_cache" \gset
+-- Compute do_ flags for Aurora sub-sections
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_version' = 't' THEN 't' ELSE 'f' END AS "do_aurora_version" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_builtins' = 't' THEN 't' ELSE 'f' END AS "do_aurora_builtins" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_instance_id' = 't' THEN 't' ELSE 'f' END AS "do_aurora_instance_id" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_cluster' = 't' THEN 't' ELSE 'f' END AS "do_aurora_cluster" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_replica_lag' = 't' THEN 't' ELSE 'f' END AS "do_aurora_replica_lag" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_ccm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_ccm" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_global_db' = 't' THEN 't' ELSE 'f' END AS "do_aurora_global_db" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wait_events' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wait_events" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_qpm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_qpm" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_dml' = 't' THEN 't' ELSE 'f' END AS "do_aurora_dml" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_memctx' = 't' THEN 't' ELSE 'f' END AS "do_aurora_memctx" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wal_cache' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wal_cache" \gset
+-- Resolve output directory: use -v outdir=/path to override, default is /tmp
+\set outdir :outdir
+SELECT CASE WHEN :'outdir' = ':outdir' THEN '/tmp' ELSE :'outdir' END AS "outdir" \gset
 \pset format html
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
-\o /tmp/pg_collector_:filename.html
+\o :outdir/pg_collector_:filename.html
 \pset footer  off
 \qecho <style type='text/css'> 
 \qecho body { 
@@ -60,7 +331,7 @@
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.4 for PostgreSQL 13</h1>
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.5 for PostgreSQL 13</h1>
 \qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-13" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
@@ -92,9 +363,261 @@ select case when pg_is_in_recovery() then 'Standby/Reader DB (Read Only)' else '
 \unset QUIET
 \qecho :server_version
 \qecho :standby_mode
+\if :fullmod
+\echo 'Generating all sections in the Report'
+\else
+\echo 'Generating specific sections in the Report:'
+\qecho <br>
+\qecho <p><b>&#9888;&#65039; Partial Report - Only selected sections are included:</b></p>
+\qecho <ul>
+\if :do_observations
+\echo '  - Observations (Health checks)'
+\qecho <li><a href="#observations">Observations (Health checks)</a></li>
+\endif
+\if :do_db_size
+\echo '  - Database size'
+\qecho <li><a href="#Database_size">Database size</a></li>
+\endif
+\if :do_txid
+\echo '  - Transaction ID TXID (Wraparound)'
+\qecho <li><a href="#Transaction_ID_TXID">Transaction ID TXID (Wraparound)</a></li>
+\endif
+\if :do_vacuum
+\echo '  - Vacuum & Statistics'
+\qecho <li><a href="#vacuum_Statistics">Vacuum & Statistics</a></li>
+\endif
+\if :do_table_size
+\echo '  - Table Size'
+\qecho <li><a href="#Table_Size">Table Size</a></li>
+\endif
+\if :do_index_size
+\echo '  - Index Size'
+\qecho <li><a href="#index_Size">Index Size</a></li>
+\endif
+\if :do_extensions
+\echo '  - Extensions'
+\qecho <li><a href="#Extensions">Extensions</a></li>
+\endif
+\if :do_memory
+\echo '  - Memory setting'
+\qecho <li><a href="#Memory_setting">Memory setting</a></li>
+\endif
+\if :do_pgss
+\echo '  - pg_stat_statements extension'
+\qecho <li><a href="#pg_stat_statements_extension">pg_stat_statements extension</a></li>
+\endif
+\if :do_users
+\echo '  - Users & Roles Info'
+\qecho <li><a href="#Users_Roles_Info">Users & Roles Info</a></li>
+\endif
+\if :do_schema
+\echo '  - Schema Info'
+\qecho <li><a href="#Schema_Info">Schema Info</a></li>
+\endif
+\if :do_tablespaces
+\echo '  - Tablespaces Info'
+\qecho <li><a href="#Tablespaces_Info">Tablespaces Info</a></li>
+\endif
+\if :do_table_access
+\echo '  - Table Access Profile'
+\qecho <li><a href="#table_Access_Profile">Table Access Profile</a></li>
+\endif
+\if :do_unused_idx
+\echo '  - Unused Indexes'
+\qecho <li><a href="#Unused Indexes">Unused Indexes</a></li>
+\endif
+\if :do_index_access
+\echo '  - Index Access Profile'
+\qecho <li><a href="#Index_Access_Profile">Index Access Profile</a></li>
+\endif
+\if :do_bloat
+\echo '  - Fragmentation (Bloat)'
+\qecho <li><a href="#Fragmentation">Fragmentation (Bloat)</a></li>
+\endif
+\if :do_toast
+\echo '  - Toast Tables Mapping'
+\qecho <li><a href="#Toast_Tables_Mapping">Toast Tables Mapping</a></li>
+\endif
+\if :do_replication
+\echo '  - Replication'
+\qecho <li><a href="#Replication">Replication</a></li>
+\endif
+\if :do_sessions
+\echo '  - Sessions/Connections Info'
+\qecho <li><a href="#sessions_info">Sessions/Connections Info</a></li>
+\endif
+\if :do_prepared_txn
+\echo '  - Orphaned prepared transactions'
+\qecho <li><a href="#Orphaned_prepared_transactions">Orphaned prepared transactions</a></li>
+\endif
+\if :do_pk_fk
+\echo '  - PK or FK using numeric/integer'
+\qecho <li><a href="#PK_FK_using_numeric_or_integer_data_type">PK or FK using numeric/integer</a></li>
+\endif
+\if :do_public_schema
+\echo '  - public Schema'
+\qecho <li><a href="#public_Schema">public Schema</a></li>
+\endif
+\if :do_invalid_idx
+\echo '  - Invalid indexes'
+\qecho <li><a href="#invalid_indexes">Invalid indexes</a></li>
+\endif
+\if :do_privileges
+\echo '  - Access privileges'
+\qecho <li><a href="#access_privileges">Access privileges</a></li>
+\endif
+\if :do_default_privileges
+\echo '  - Default access privileges'
+\qecho <li><a href="#default_access_privileges">Default access privileges</a></li>
+\endif
+\if :do_pgaudit
+\echo '  - pgaudit extension'
+\qecho <li><a href="#pgaudit_extension">pgaudit extension</a></li>
+\endif
+\if :do_unlogged_tables
+\echo '  - Unlogged Tables'
+\qecho <li><a href="#unlogged_tables">Unlogged Tables</a></li>
+\endif
+\if :do_ssl
+\echo '  - SSL'
+\qecho <li><a href="#ssl">SSL</a></li>
+\endif
+\if :do_bg_processes
+\echo '  - Background processes'
+\qecho <li><a href="#background_processes">Background processes</a></li>
+\endif
+\if :do_mxid
+\echo '  - Multixact ID MXID'
+\qecho <li><a href="#Multixact_ID_MXID">Multixact ID MXID</a></li>
+\endif
+\if :do_temp
+\echo '  - Temp Tables'
+\qecho <li><a href="#Temp_tables">Temp Tables</a></li>
+\endif
+\if :do_large_objects
+\echo '  - Large objects'
+\qecho <li><a href="#Large_objects">Large objects</a></li>
+\endif
+\if :do_partitions
+\echo '  - Partition tables'
+\qecho <li><a href="#Partition_tables">Partition tables</a></li>
+\endif
+\if :do_sequences
+\echo '  - Sequences'
+\qecho <li><a href="#sequences">Sequences</a></li>
+\endif
+\if :do_pg_hba
+\echo '  - pg_hba.conf'
+\qecho <li><a href="#pg_hba.conf">pg_hba.conf</a></li>
+\endif
+\if :do_dup_idx
+\echo '  - Duplicate indexes'
+\qecho <li><a href="#Duplicate_indexes">Duplicate indexes</a></li>
+\endif
+\if :do_functions
+\echo '  - Functions statistics'
+\qecho <li><a href="#functions_statistics">Functions statistics</a></li>
+\endif
+\if :do_db_load
+\echo '  - DB Load'
+\qecho <li><a href="#DB_Load">DB Load</a></li>
+\endif
+\if :do_triggers
+\echo '  - Triggers'
+\qecho <li><a href="#triggers">Triggers</a></li>
+\endif
+\if :do_pg_config
+\echo '  - pg_config'
+\qecho <li><a href="#pg_config">pg_config</a></li>
+\endif
+\if :do_db_params
+\echo '  - DB parameters'
+\qecho <li><a href="#DB_parameters">DB parameters</a></li>
+\endif
+\if :do_idx_progress
+\echo '  - Index Creation Progress'
+\qecho <li><a href="#Index_Creation_Progress">Index Creation Progress</a></li>
+\endif
+\if :do_invalid_db
+\echo '  - Invalid databases'
+\qecho <li><a href="#Invalid_databases">Invalid databases</a></li>
+\endif
+\if :do_mat_views
+\echo '  - Materialized Views'
+\qecho <li><a href="#Materialized_Views">Materialized Views</a></li>
+\endif
+\if :do_foreign_servers
+\echo '  - Foreign Servers'
+\qecho <li><a href="#Foreign_Servers">Foreign Servers</a></li>
+\endif
+\if :do_pg_shdepend
+\echo '  - pg_shdepend (shared object dependencies)'
+\qecho <li><a href="#pg_shdepend">pg_shdepend</a></li>
+\endif
+\if :do_fk_no_index
+\echo '  - FK without index'
+\qecho <li><a href="#FK_without_index">FK without index</a></li>
+\endif
+\if :do_aurora_version
+\echo '  - Aurora version'
+\qecho <li><a href="#Aurora_version">Aurora version</a></li>
+\endif
+\if :do_aurora_builtins
+\echo '  - Aurora built-in functions'
+\qecho <li><a href="#Aurora_PostgreSQL_built-in_functions">Aurora built-in functions</a></li>
+\endif
+\if :do_aurora_instance_id
+\echo '  - Aurora db instance identifier'
+\qecho <li><a href="#Aurora_db_instance_identifier">Aurora db instance identifier</a></li>
+\endif
+\if :do_aurora_cluster
+\echo '  - Aurora cluster instances'
+\qecho <li><a href="#Aurora_cluster_instances">Aurora cluster instances</a></li>
+\endif
+\if :do_aurora_replica_lag
+\echo '  - Aurora reader instances - Replica Lag'
+\qecho <li><a href="#Aurora_reader_instances-Replica_Lag">Aurora reader instances - Replica Lag</a></li>
+\endif
+\if :do_aurora_ccm
+\echo '  - Aurora cluster cache management (CCM)'
+\qecho <li><a href="#Aurora_cluster_cache_management_(CCM)">Aurora cluster cache management (CCM)</a></li>
+\endif
+\if :do_aurora_global_db
+\echo '  - Aurora global db status'
+\qecho <li><a href="#Aurora_global_db_status">Aurora global db status</a></li>
+\endif
+\if :do_aurora_wait_events
+\echo '  - Aurora wait event stat'
+\qecho <li><a href="#Aurora_wait_event_stat">Aurora wait event stat</a></li>
+\endif
+\if :do_aurora_qpm
+\echo '  - Query Plan Management (QPM)'
+\qecho <li><a href="#query_plan_management">Query Plan Management (QPM)</a></li>
+\endif
+\if :do_aurora_dml
+\echo '  - Aurora DML activity'
+\qecho <li><a href="#Aurora_dml_activity">Aurora DML activity</a></li>
+\endif
+\if :do_aurora_memctx
+\echo '  - Process memory context usage'
+\qecho <li><a href="#process_memory_context_usage">Process memory context usage</a></li>
+\endif
+\if :do_aurora_wal_cache
+\echo '  - Logical replication write-through cache'
+\qecho <li><a href="#logical_replication_write_through_cache">Logical replication write-through cache</a></li>
+\endif
+\qecho </ul>
+\endif
+\qecho <br>
 \qecho <br>
 \qecho <br>
 select  now () as "Date" ,pg_postmaster_start_time() as "DB_START_DATE", current_timestamp - pg_postmaster_start_time() as "UP_TIME"  ,current_database() as "DB_connected" ,current_user USER_NAME,inet_server_port() as "DB_PORT ",version()  as "DB_Version" , setting AS block_size FROM pg_settings WHERE name = 'block_size';
+\qecho <br>
+\qecho <br>
+SELECT 
+    count(*) FILTER (WHERE NOT datistemplate) AS databases_count,
+    count(*) FILTER (WHERE datistemplate) AS template_databases_count
+FROM pg_database;
 \qecho <br>
 \qecho <br>
 \l+
@@ -168,6 +691,12 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#triggers">Triggers</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#pg_config">pg_config</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Invalid_databases">Invalid databases</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Index_Creation_Progress">Index Creation Progress</a></td>
+\qecho </tr>
+\qecho <tr>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Materialized_Views">Materialized Views</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#Foreign_Servers">Foreign Servers</a></td>
+\qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
 \qecho </table>
@@ -204,6 +733,7 @@ select datname as Database_name , datistemplate as database_is_template ,datallo
 \qecho <br>
 \qecho <br>
 \qecho <br>
+\if :do_observations
 -- +----------------------------------------------------------------------------+
 -- |      - observations                                                     -  |
 -- +----------------------------------------------------------------------------+
@@ -347,7 +877,7 @@ FROM pg_replication_slots WHERE active='f' \gset
 ------------------------------------------
 -- Check for Low remaining sequences --
 ------------------------------------------
-SELECT count(1) as obsrv_less_remaining_sequences FROM (SELECT 
+SELECT count(1) > 0 as obsrv_less_remaining_sequences FROM (SELECT 
     schemaname as Schema,
     sequencename as Sequence_Name,
     data_type::regtype as Data_Type,
@@ -623,13 +1153,24 @@ where myrank = 1
 \endif
 
 ---------------------------------
--- Add a new check             --
+-- Check for pending restart   --
 ---------------------------------
-\qecho <br>
-\qecho <br>
-\qecho <br>
-\qecho <br>
+SELECT count(*) > 0 obsrv_pending_restart
+FROM pg_settings WHERE pending_restart = true \gset
 
+\if :obsrv_pending_restart
+    \qecho <br>
+    \qecho '&#8594; The database has parameters that have been changed but require a restart to take effect. Please check the following section <a class="link" href="#DB_parameters">DB parameters</a> .'
+\else
+\endif
+
+\qecho <br>
+\qecho <br>
+\qecho <br>
+\qecho <br>
+\endif
+
+\if :do_db_size
 -- +----------------------------------------------------------------------------+
 -- |      - Database_size                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -638,8 +1179,17 @@ where myrank = 1
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Database size</b></font><hr align="left" width="460">
 SELECT pg_database.datname Database_Name , pg_size_pretty(pg_database_size(pg_database.datname)) AS Database_Size FROM pg_database;
 
-\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\qecho <br>
+\qecho <h3>Total size across all databases</h3>
+SELECT 
+    sum(pg_database_size(pg_database.datname)) AS Total_size_bytes,
+    pg_size_pretty(sum(pg_database_size(pg_database.datname))) AS Total_size_pretty
+FROM pg_database;
 
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+
+\if :do_txid
 -- +----------------------------------------------------------------------------+
 -- |      - Transaction ID TXID                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -1062,7 +1612,9 @@ order by 2,4 ;
 
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_table_size
 -- +----------------------------------------------------------------------------+
 -- |      - Table_Size                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -1119,8 +1671,10 @@ LIMIT 50;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_index_size
 -- +----------------------------------------------------------------------------+
 -- |      - index_Size                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -1151,7 +1705,9 @@ FROM pg_catalog.pg_statio_all_indexes  ORDER BY 4 desc limit 50;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_vacuum
 -- +----------------------------------------------------------------------------+
 -- |      - vacuum and Statistics           -                  |
 -- +----------------------------------------------------------------------------+
@@ -1273,13 +1829,13 @@ select * from pg_stat_all_tables order by schemaname;
 \qecho <h3>pg_stat_all_tables order by autovacuum_count : </h3>
 \qecho <br>
 \qecho <details>
-select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count from pg_stat_all_tables  where schemaname not in ('pg_catalog','pg_toast') order by autovacuum_count desc;
+select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count,trunc(extract(epoch from (now() - coalesce(last_vacuum, last_autovacuum)))/3600,2) as hours_since_last_vacuum,trunc(extract(epoch from (now() - coalesce(last_vacuum, last_autovacuum)))/86400,2) as days_since_last_vacuum from pg_stat_all_tables order by autovacuum_count desc;
 \qecho </details>
 \qecho <br>
 \qecho <h3>pg_stat_all_tables order by autoanalyze_count: </h3>
 \qecho <br>
 \qecho <details>
-select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count from pg_stat_all_tables  where schemaname not in ('pg_catalog','pg_toast') order by autoanalyze_count desc;
+select relname,schemaname,last_vacuum,last_autovacuum,last_analyze,last_autoanalyze,vacuum_count,autovacuum_count,analyze_count,autoanalyze_count,trunc(extract(epoch from (now() - coalesce(last_vacuum, last_autovacuum)))/3600,2) as hours_since_last_vacuum,trunc(extract(epoch from (now() - coalesce(last_vacuum, last_autovacuum)))/86400,2) as days_since_last_vacuum from pg_stat_all_tables order by autoanalyze_count desc;
 \qecho </details>
 \qecho <br>
 \qecho <h3>tables without auto analyze : </h3>
@@ -1327,8 +1883,10 @@ select relname as table_name , pg_namespace.nspname as schema_name ,reloptions f
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_extensions
 -- +----------------------------------------------------------------------------+
 -- |      - Extensions                                     -                  |
 -- +----------------------------------------------------------------------------+
@@ -1390,7 +1948,9 @@ select * from pg_available_extensions order by installed_version;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_memory
 -- +----------------------------------------------------------------------------+
 -- |      - Memory setting                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -1451,7 +2011,9 @@ FROM
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_pgss
 -- +----------------------------------------------------------------------------+
 -- |      - pg_stat_statements extension                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -1464,6 +2026,19 @@ select count(*) > 0 is_pg_stat_statements_enabled FROM pg_catalog.pg_extension w
 \qecho <h3> pg_stat_statements installed version: </h3>
 \qecho <br>
 \qecho <details>
+-- Check if pg_stat_statements is outdated and inform user
+SELECT count(*) > 0 AS v_pgss_outdated
+FROM pg_available_extension_versions av
+JOIN pg_extension e ON e.extname = av.name
+WHERE av.name = 'pg_stat_statements'
+  AND av.installed = false
+  AND (string_to_array(av.version, '.')::int[] > string_to_array(e.extversion, '.')::int[]) \gset
+\if :v_pgss_outdated
+\echo 'WARNING: pg_stat_statements is outdated. Run: ALTER EXTENSION pg_stat_statements UPDATE;'
+\qecho <br>
+\qecho <h4 style="color:red;">&#9888; pg_stat_statements is outdated. Run "ALTER EXTENSION pg_stat_statements UPDATE;" .</h4>
+\qecho <br>
+\endif
 SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
  FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
  where e.extname = 'pg_stat_statements';
@@ -1509,28 +2084,12 @@ from (
 where myrank = 1
 order by name;
 \qecho </details>
-\qecho <br>        
-\qecho <h3> pg_stat_statements_info view: </h3>       
-\qecho <br>
-\qecho <details>
-\qecho <h4> The statistics of the pg_stat_statements module itself are tracked and made available via a view named pg_stat_statements_info </h4>
-\qecho <h4> dealloc column show the Total number of times pg_stat_statements entries about the least-executed statements were deallocated because more distinct statements than pg_stat_statements.max were observed </h4> 
-
-select count(*) > 0 as v_pgstatextv19 from pg_extension where extname = 'pg_stat_statements' and (regexp_split_to_array(extversion, '\.'))[1]::bigint >= 1 and (regexp_split_to_array(extversion, '\.'))[2]::bigint > 8 \gset
-
-\if :v_pgstatextv19
-  select * from pg_stat_statements_info ;
-\else
-  \qecho <h4> Note: The pg_stat_statements_info view is available from pg_stat_statements version 1.9 and later </h4>
-\endif
-
-\qecho </details>
 \qecho <br>
 \qecho <h3> Top SQL order by total_exec_time: </h3>
 \qecho <br>
 \qecho <details>
 --Top SQL order by total_exec_time
-\if :v_pgstatextv19
+
 select queryid,substring(query,1,60) as query , calls, 
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -1542,19 +2101,7 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by total_time_Msec desc limit 20;
-\else
-select queryid,substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
-round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
-from pg_stat_statements 
-order by total_time_Msec desc limit 20;
-\endif
+
 \qecho </details>
 
 \qecho <br>
@@ -1562,7 +2109,7 @@ order by total_time_Msec desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by avg_time
-\if :v_pgstatextv19
+
 select queryid,substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -1574,19 +2121,7 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by avg_time_Msec desc limit 20;
-\else
-select queryid,substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
-round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
-from pg_stat_statements 
-order by avg_time_Msec desc limit 20;
-\endif
+
 \qecho </details>
 
 \qecho <br>
@@ -1594,7 +2129,7 @@ order by avg_time_Msec desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by percent of total DB time
-\if :v_pgstatextv19
+
 select queryid,substring(query,1,60) as query , calls, 
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -1606,19 +2141,7 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by percent desc limit 20;
-\else
-select queryid,substring(query,1,60) as query , calls, 
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
-round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
-from pg_stat_statements 
-order by percent desc limit 20;
-\endif
+
 \qecho </details>
 
 \qecho <br>
@@ -1626,7 +2149,7 @@ order by percent desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by number of execution (CALLs)
-\if :v_pgstatextv19  
+ 
 select queryid,substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -1638,19 +2161,7 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent
 from pg_stat_statements 
 order by calls desc limit 20;
-\else
-select queryid,substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
-round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent
-from pg_stat_statements 
-order by calls desc limit 20;
-\endif
+
 \qecho </details>
 
 \qecho <br>
@@ -1658,7 +2169,7 @@ order by calls desc limit 20;
 \qecho <br>
 \qecho <details>
 --Top SQL order by shared blocks read (physical reads)
-\if :v_pgstatextv19 
+
 select queryid, substring(query,1,60) as query , calls,
 round(total_exec_time::numeric, 2) as total_time_Msec, 
 round((total_exec_time::numeric/1000), 2) as total_time_sec,
@@ -1671,20 +2182,32 @@ round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as per
 shared_blks_read
 from pg_stat_statements 
 order by shared_blks_read desc limit 20;
-\else
-select queryid, substring(query,1,60) as query , calls,
-round(total_time::numeric, 2) as total_time_Msec, 
-round((total_time::numeric/1000), 2) as total_time_sec,
-round(mean_time::numeric,2) as avg_time_Msec,
-round((mean_time::numeric/1000),2) as avg_time_sec,
-round(stddev_time::numeric, 2) as standard_deviation_time_Msec, 
-round((stddev_time::numeric/1000), 2) as standard_deviation_time_sec, 
-round(rows::numeric/calls,2) rows_per_exec,
-round((100 * total_time / sum(total_time) over ())::numeric, 4) as percent,
-shared_blks_read
-from pg_stat_statements 
-order by shared_blks_read desc limit 20;
-\endif
+
+\qecho </details>
+
+\qecho <br>
+\qecho <h3> Top SQL order by WAL Generation: </h3>
+\qecho <br>
+\qecho <details>
+\qecho <h4>Note: Identifies queries generating the most WAL - impacts replication lag, WAL archiving, and checkpoint frequency. wal_fpi (full page images) indicates heavy writes to cold pages after checkpoints.</h4>
+SELECT
+    queryid,
+    substring(query, 1, 150) AS query,
+    calls,
+    round(total_exec_time::numeric, 2) AS total_time_Msec,
+    round(mean_exec_time::numeric, 2) AS avg_time_Msec,
+    rows,
+    wal_records,
+    wal_fpi,
+    wal_bytes,
+    pg_size_pretty(wal_bytes::bigint) AS wal_bytes_pretty,
+    round((wal_bytes / NULLIF(calls, 0))::numeric, 2) AS wal_bytes_per_call
+FROM
+    pg_stat_statements
+WHERE
+    wal_bytes > 0
+ORDER BY wal_bytes DESC
+LIMIT 20;
 \qecho </details>
 \else
     \if yes
@@ -1694,7 +2217,9 @@ order by shared_blks_read desc limit 20;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_users
 -- +----------------------------------------------------------------------------+
 -- |      - Users_Roles_Info                                  -                  |
 -- +----------------------------------------------------------------------------+
@@ -1714,7 +2239,9 @@ select * FROM pg_user;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_schema
 -- +----------------------------------------------------------------------------+
 -- |      - Schema_Info                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -1727,6 +2254,29 @@ select * FROM pg_user;
 \qecho <br>
 \qecho <details>
 \dn+
+\qecho </details>
+\qecho <br>
+\qecho <h3>Schema Size:</h3>
+\qecho <br>
+\qecho <details>
+-- pg_total_relation_size is a built-in PostgreSQL system function that returns the total on-disk space
+-- used by a specific relation (like a table). It includes the base table data, all associated indexes,
+-- TOAST tables (used for oversized attributes), and TOAST indexes
+SELECT
+    n.nspname AS "Schema",
+    pg_size_pretty(SUM(pg_total_relation_size(c.oid))) AS "Total Size"
+FROM
+    pg_class c
+INNER JOIN
+    pg_namespace n ON n.oid = c.relnamespace
+WHERE
+-- pg_toast% Internal schemas for TOAST (The Oversized-Attribute Storage Technique)
+-- already counted in pg_total_relation_size() of parent tables
+    n.nspname NOT LIKE 'pg_toast%'
+GROUP BY
+    n.nspname
+ORDER BY
+    SUM(pg_total_relation_size(c.oid)) DESC;
 \qecho </details>
 \qecho <br>
 \qecho <h3>Total objects Count in the database:</h3>
@@ -1822,7 +2372,9 @@ order by 1,2,4;
 \qecho <br>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_tablespaces
 -- +----------------------------------------------------------------------------+
 -- |      - Tablespaces_Info                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -1855,7 +2407,9 @@ ORDER BY 1;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_table_access
 -- +----------------------------------------------------------------------------+
 -- |      -table_Access_Profile                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -2031,7 +2585,9 @@ order by physical_reads_percent  desc limit 50  ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_unused_idx
 -- +----------------------------------------------------------------------------+
 -- |      - Unused_Indexes                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -2068,8 +2624,10 @@ order by index_size desc;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_index_access
 -- +----------------------------------------------------------------------------+
 -- |      - Index_Access_Profile                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -2161,7 +2719,9 @@ order by physical_reads_percent desc limit 50 ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_bloat
 -- +----------------------------------------------------------------------------+
 -- |      - Fragmentation                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -2332,7 +2892,9 @@ ORDER BY 8 desc;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_toast
 -- +----------------------------------------------------------------------------+
 -- |      - Toast_Tables_Mapping                                  -                  |
 -- +----------------------------------------------------------------------------+
@@ -2362,9 +2924,34 @@ FROM
 INNER JOIN pg_class t ON r.oid = t.reltoastrelid
 order by toast_size_bytes desc ;  
 \qecho </details>
+\qecho <br>
+\qecho <h3>Total TOAST Size:</h3>
+\qecho <br>
+-- pg_total_relation_size includes both the TOAST table data and its associated indexes
+SELECT
+    pg_size_pretty(SUM(pg_total_relation_size(reltoastrelid))) AS "Actual Total TOAST Size"
+FROM pg_class
+WHERE reltoastrelid != 0;
+\qecho <br>
+\qecho <h3>TOAST Size per Schema:</h3>
+\qecho <br>
+-- Shows TOAST storage consumed by each schema (based on parent table ownership)
+-- pg_total_relation_size includes both the TOAST table data and its associated indexes
+SELECT
+    n.nspname AS "Schema",
+    COUNT(t.reltoastrelid) AS "Tables with TOAST",
+    pg_size_pretty(SUM(pg_total_relation_size(t.reltoastrelid))) AS "Total TOAST Size"
+FROM pg_class t
+INNER JOIN pg_namespace n ON n.oid = t.relnamespace
+WHERE t.reltoastrelid != 0
+  AND n.nspname NOT LIKE 'pg_toast%'
+GROUP BY n.nspname
+ORDER BY SUM(pg_total_relation_size(t.reltoastrelid)) DESC;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_replication
 -- +----------------------------------------------------------------------------+
 -- |      - Replication                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -2440,8 +3027,10 @@ WHERE name in ('wal_level','max_wal_senders','max_replication_slots',
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_sessions
 -- +----------------------------------------------------------------------------+
 -- |      - sessions_info                                                     - |
 -- +----------------------------------------------------------------------------+
@@ -2520,8 +3109,10 @@ order by xact_duration desc, query_duration desc;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_prepared_txn
 -- +----------------------------------------------------------------------------+
 -- |      - Orphaned_prepared_transactions                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -2541,8 +3132,10 @@ ORDER BY age(transaction) DESC;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_pk_fk
 -- +----------------------------------------------------------------------------+
 -- |      - PK_FK_using_numeric_or_integer_data_type         -                  |
 -- +----------------------------------------------------------------------------+
@@ -2589,7 +3182,9 @@ c.position
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_public_schema
 -- +----------------------------------------------------------------------------+
 -- |      - public_Schema                                  -                  |
 -- +----------------------------------------------------------------------------+
@@ -2693,7 +3288,9 @@ string_agg(event_manipulation, ',') as event,
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_invalid_idx
 -- +----------------------------------------------------------------------------+
 -- |      - invalid_indexes                                 -                  |
 -- +----------------------------------------------------------------------------+
@@ -2708,21 +3305,36 @@ string_agg(event_manipulation, ',') as event,
 \qecho <h4> To fix invalid indexes, you can drop and re-create the index or use REINDEX command </h4>
 \qecho <details>
 select count (*) as count_of_invalid_indxes from pg_index WHERE pg_index.indisvalid = false ;
-with table_info as 
-(SELECT pg_index.indrelid , pg_class.oid, pg_class.relname as table_name 
-from   pg_class , pg_index
-where pg_index.indrelid = pg_class.oid )
-SELECT distinct pg_index.indexrelid as INDX_ID,pg_class.relname as index_name ,table_info.table_name,pg_namespace.nspname as schema_name  , pg_class.relowner as owner_id , pg_index.indisvalid as indx_is_valid
-FROM pg_class , pg_index ,pg_namespace , table_info
-WHERE pg_index.indisvalid = false 
-AND pg_index.indexrelid = pg_class.oid
-and pg_class.relnamespace = pg_namespace.oid
-and pg_index.indrelid = table_info.oid
-;
+WITH table_info AS (
+  SELECT
+    pg_index.indrelid,
+    pg_class.oid,
+    pg_class.relname AS table_name
+  FROM pg_class, pg_index
+  WHERE pg_index.indrelid = pg_class.oid
+)
+SELECT DISTINCT
+  pg_index.indexrelid AS index_oid,
+  pg_class.relname AS index_name,
+  table_info.table_name,
+  pg_namespace.nspname AS schema_name,
+  pg_class.relowner AS owner_oid,
+  pg_index.indisvalid AS is_valid,
+  pg_relation_size(pg_class.oid) AS index_size_bytes,
+  pg_size_pretty(pg_relation_size(pg_class.oid)) AS index_size_pretty,
+  pg_get_indexdef(pg_index.indexrelid) AS index_def
+FROM pg_class, pg_index, pg_namespace, table_info
+WHERE pg_index.indisvalid = false
+  AND pg_index.indexrelid = pg_class.oid
+  AND pg_class.relnamespace = pg_namespace.oid
+  AND pg_index.indrelid = table_info.oid
+ORDER BY pg_relation_size(pg_class.oid) DESC;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_default_privileges
 -- +----------------------------------------------------------------------------+
 -- |      - default_access_privileges                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -2742,7 +3354,9 @@ ORDER BY 1, 2, 3;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_pgaudit
 -- +----------------------------------------------------------------------------+
 -- |      - pgaudit_extension                                  -                |
 -- +----------------------------------------------------------------------------+
@@ -2764,7 +3378,9 @@ select usename as user_name,useconfig as user_config FROM pg_user where useconfi
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_unlogged_tables
 -- +----------------------------------------------------------------------------+
 -- |      - unlogged_tables                                    -                |
 -- +----------------------------------------------------------------------------+
@@ -2781,7 +3397,9 @@ select relname as table_name, relpersistence FROM pg_class WHERE relpersistence 
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_privileges
 -- +----------------------------------------------------------------------------+
 -- |      - access_privileges                                    -              |
 -- +----------------------------------------------------------------------------+
@@ -2808,7 +3426,9 @@ ORDER BY 1, 3, 2;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_ssl
 -- +----------------------------------------------------------------------------+
 -- |      - ssl   -                                                             |
 -- +----------------------------------------------------------------------------+
@@ -2843,7 +3463,9 @@ order by ssl ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_bg_processes
 -- +----------------------------------------------------------------------------+
 -- |      - background_processes                                   -            |
 -- +----------------------------------------------------------------------------+
@@ -2860,7 +3482,9 @@ SELECT  pid , backend_type as  "Background processes Type" , backend_start as "s
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_mxid
 -- +----------------------------------------------------------------------------+
 -- |      - Multixact ID MXID                                -                  |
 -- +----------------------------------------------------------------------------+
@@ -2889,8 +3513,9 @@ order by 2 desc limit 20;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
-
+\if :do_temp
 -- +----------------------------------------------------------------------------+
 -- |      - Temp tables                                      -                  |
 -- +----------------------------------------------------------------------------+
@@ -2942,7 +3567,9 @@ ORDER BY pg_relation_size(n.nspname ||'.'|| c.relname) DESC ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_large_objects
 -- +----------------------------------------------------------------------------+
 -- |      - Large_objects                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -2982,8 +3609,10 @@ group by 1  order by 2 desc;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_partitions
 -- +----------------------------------------------------------------------------+
 -- |      - Partition_tables                                    -               |
 -- +----------------------------------------------------------------------------+
@@ -3020,11 +3649,55 @@ FROM pg_inherits
     JOIN pg_class parent            ON pg_inherits.inhparent = parent.oid
     JOIN pg_class child             ON pg_inherits.inhrelid   = child.oid 
     order by 3 ,6;
+
+\qecho <br>
+\qecho <h3>Partition tables summary with total sizes</h3>
+
+SELECT
+    parent.relnamespace::regnamespace AS parent_schema,
+    parent.relname                    AS parent_table_name,
+    count(child.oid)                  AS partition_count,
+    pg_size_pretty(sum(pg_total_relation_size(child.oid))) AS total_size,
+    pg_size_pretty(sum(pg_relation_size(child.oid))) AS table_size,
+    pg_size_pretty(sum(pg_total_relation_size(child.oid)) - sum(pg_relation_size(child.oid))) AS indexes_size,
+    sum(pg_total_relation_size(child.oid)) AS total_size_bytes
+FROM pg_inherits
+    JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+    JOIN pg_class child ON pg_inherits.inhrelid = child.oid
+    JOIN pg_namespace pn ON parent.relnamespace = pn.oid
+WHERE pn.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+  AND parent.relkind = 'p'
+GROUP BY parent.relnamespace, parent.relname
+ORDER BY sum(pg_total_relation_size(child.oid)) DESC;
+
+\qecho <br>
+\qecho <h3>Individual partition sizes with details</h3>
+
+SELECT
+    parent.relnamespace::regnamespace AS parent_schema,
+    parent.relname                    AS parent_table_name,
+    child.relname                     AS partition_name,
+    pg_size_pretty(pg_total_relation_size(child.oid)) AS total_size,
+    pg_size_pretty(pg_relation_size(child.oid)) AS table_size,
+    pg_size_pretty(pg_indexes_size(child.oid)) AS indexes_size,
+    pg_size_pretty(pg_total_relation_size(child.oid) - pg_relation_size(child.oid) - pg_indexes_size(child.oid)) AS toast_size,
+    round(100.0 * pg_total_relation_size(child.oid) / 
+          NULLIF(sum(pg_total_relation_size(child.oid)) OVER (PARTITION BY parent.oid), 0), 2) AS pct_of_parent,
+    pg_total_relation_size(child.oid) AS total_size_bytes
+FROM pg_inherits
+    JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+    JOIN pg_class child ON pg_inherits.inhrelid = child.oid
+    JOIN pg_namespace pn ON parent.relnamespace = pn.oid
+WHERE pn.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+ORDER BY parent.relnamespace, parent.relname, pg_total_relation_size(child.oid) DESC;
+
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_pg_shdepend
 -- +----------------------------------------------------------------------------+
 -- |      - pg_shdepend                                    -                    |
 -- +----------------------------------------------------------------------------+
@@ -3045,7 +3718,9 @@ order by 1,3 desc;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_fk_no_index
 -- +----------------------------------------------------------------------------+
 -- |      - FK_without_index                                 -                  |
 -- +----------------------------------------------------------------------------+
@@ -3086,8 +3761,10 @@ ORDER BY pg_catalog.pg_relation_size(c.conrelid) DESC;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_sequences
 -- +----------------------------------------------------------------------------+
 -- |      - sequences                                    -                      |
 -- +----------------------------------------------------------------------------+
@@ -3097,6 +3774,30 @@ ORDER BY pg_catalog.pg_relation_size(c.conrelid) DESC;
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Sequences</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
+-- Detection query for sequences section (self-contained for selective mode)
+SELECT count(1) > 0 as obsrv_less_remaining_sequences FROM (SELECT 
+    schemaname as Schema,
+    sequencename as Sequence_Name,
+    data_type::regtype as Data_Type,
+    last_value as Current_Value,
+    max_value as Max_Value,
+    min_value as Min_Value,
+    increment_by as Increment_By,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Limit'
+        ELSE round(((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100), 2)::text || '%'
+    END as Remaining_Percentage,
+    CASE 
+        WHEN max_value = 9223372036854775807 THEN 'No Action Needed'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 1 
+        THEN 'CRITICAL: Less than 1% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 5 
+        THEN 'WARNING: Less than 5% remaining'
+        WHEN ((max_value - last_value)::numeric / (max_value - min_value)::numeric * 100) < 10 
+        THEN 'NOTICE: Less than 10% remaining'
+        ELSE 'OK'
+    END as Status
+FROM pg_sequences) seq WHERE status not in ('OK', 'No Action Needed') \gset
 \if :obsrv_less_remaining_sequences
 \qecho <h4> Sequences that have less than 10% remaining values need attention to prevent potential issues: </h4>
 \qecho <ul>
@@ -3158,7 +3859,9 @@ select * ,(sec.max_value - coalesce(sec.last_value,0)) as remain_values ,round((
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_pg_hba
 -- +----------------------------------------------------------------------------+
 -- |      - pg_hba.conf                                   -                     |
 -- +----------------------------------------------------------------------------+
@@ -3174,9 +3877,11 @@ select * from pg_hba_file_rules;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
 
+\if :do_dup_idx
 -- +----------------------------------------------------------------------------+
 -- |      - Duplicate_indexes                                   -               |
 -- +----------------------------------------------------------------------------+
@@ -3193,20 +3898,59 @@ select * from pg_hba_file_rules;
 \qecho <h4> SELECT * FROM pg_catalog.pg_stat_all_indexes WHERE indexrelname in ('\''Index Name'\'','\''Index Name'\''); </h4>
 \qecho <br>
 \qecho <details>
-SELECT pg_size_pretty(sum(pg_relation_size(idx))::bigint) as size,
-       (array_agg(idx))[1] as idx1, (array_agg(idx))[2] as idx2,
-       (array_agg(idx))[3] as idx3, (array_agg(idx))[4] as idx4
-FROM (
-    SELECT indexrelid::regclass as idx, (indrelid::text ||E'\n'|| indclass::text ||E'\n'|| indkey::text ||E'\n'||
-                                         coalesce(indexprs::text,'')||E'\n' || coalesce(indpred::text,'')) as key
-    FROM pg_index) sub
-GROUP BY key HAVING count(*)>1
-ORDER BY sum(pg_relation_size(idx)) DESC;
+WITH duplicate_indexes AS (
+  SELECT
+    indexrelid::regclass as index_name,
+    indrelid::regclass as table_name,
+    pg_relation_size(indexrelid) as index_size_bytes,
+    pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+    pg_get_indexdef(indexrelid) as index_definition,
+    (indrelid::text || E'\n' ||
+     indclass::text || E'\n' ||
+     indkey::text || E'\n' ||
+     coalesce(indexprs::text, '') || E'\n' ||
+     coalesce(indpred::text, '')) as duplicate_key,
+    indisunique as is_unique,
+    indisprimary as is_primary,
+    indisvalid as is_valid
+  FROM pg_index
+),
+duplicate_groups AS (
+  SELECT
+    duplicate_key,
+    count(*) as duplicate_count,
+    sum(index_size_bytes) as total_size_bytes
+  FROM duplicate_indexes
+  GROUP BY duplicate_key
+  HAVING count(*) > 1
+)
+SELECT
+  di.table_name,
+  di.index_name,
+  di.index_size,
+  di.is_valid,
+  dg.duplicate_count,
+  pg_size_pretty(dg.total_size_bytes) as total_group_size,
+  CASE
+    WHEN di.is_primary THEN 'PRIMARY KEY'
+    WHEN di.is_unique THEN 'UNIQUE'
+    ELSE 'NOT PK OR UNIQUE'
+  END as index_type,
+  di.index_definition
+FROM duplicate_indexes di
+JOIN duplicate_groups dg ON di.duplicate_key = dg.duplicate_key
+ORDER BY
+  dg.total_size_bytes DESC,
+  di.table_name,
+  di.is_valid ASC,  -- Invalid indexes first (false < true)
+  di.index_size_bytes DESC;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_functions
 -- +----------------------------------------------------------------------------+
 -- |      - functions_statistics                             -                  |
 -- +----------------------------------------------------------------------------+
@@ -3224,15 +3968,17 @@ SELECT name,setting from pg_settings where name ='track_functions';
 \qecho <br>
 select
 schemaname||'.'||funcname func_name, calls, total_time,
-round((total_time/calls)::numeric,2) as mean_time, self_time
+round((total_time/NULLIF(calls,0))::numeric,2) as mean_time, self_time
 from pg_catalog.pg_stat_user_functions
 order by total_time desc;
 
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_db_load
 -- +----------------------------------------------------------------------------+
 -- |      - DB_Load                                          -                  |
 -- +----------------------------------------------------------------------------+
@@ -3302,7 +4048,9 @@ select * from pg_stat_database_conflicts;
 
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_triggers
 -- +----------------------------------------------------------------------------+
 -- |      - triggers                                         -                  |
 -- +----------------------------------------------------------------------------+
@@ -3383,7 +4131,9 @@ order by table_id , trigger_status_code;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_pg_config
 -- +----------------------------------------------------------------------------+
 -- |      - pg_config                                        -                  |
 -- +----------------------------------------------------------------------------+
@@ -3407,8 +4157,10 @@ select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and se
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_db_params
 -- +----------------------------------------------------------------------------+
 -- |      - DB_parameters                                    -                  |
 -- +----------------------------------------------------------------------------+
@@ -3416,6 +4168,22 @@ select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and se
 \qecho <a name="DB_parameters"></a>
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB parameters</b></font><hr align="left" width="460">
 \qecho <br>
+-- Detection queries for DB parameters warnings (self-contained for selective mode)
+select count(*) > 0 obsrv_autovacuum_parameter_disabled FROM pg_settings WHERE name = 'autovacuum' and setting != 'on' \gset
+select count(*) > 0 obsrv_track_counts_parameter_disabled FROM pg_settings WHERE name = 'track_counts' and setting != 'on' \gset
+select count(*) > 0 obsrv_enable_indexonlyscan_parameter_disabled FROM pg_settings WHERE name = 'enable_indexonlyscan' and setting != 'on' \gset
+select count(*) > 0 obsrv_enable_indexscan_parameter_disabled FROM pg_settings WHERE name = 'enable_indexscan' and setting != 'on' \gset
+SELECT count(*) > 0 obsrv_excessive_logging_logstatement FROM pg_settings WHERE name = 'log_statement' and setting IN ('all', 'mod') \gset
+SELECT count(*) > 0 obsrv_excessive_logging_logsmindurstmt FROM pg_settings WHERE name = 'log_min_duration_statement' and setting IN ('0') \gset
+SELECT count(*) > 0 obsrv_excessive_logging_logsminmsgs FROM pg_settings WHERE name = 'log_min_messages' and setting IN ('debug5', 'debug4', 'debug3', 'debug2', 'debug1') \gset
+SELECT count(*) > 0 obsrv_excessive_log_stmt_stats FROM pg_settings WHERE name = 'log_statement_stats' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_log_parser_stats FROM pg_settings WHERE name = 'log_parser_stats' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_log_planner_stats FROM pg_settings WHERE name = 'log_planner_stats' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_log_executor_stats FROM pg_settings WHERE name = 'log_executor_stats' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_debug_print_parse FROM pg_settings WHERE name = 'debug_print_parse' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_debug_print_rewritten FROM pg_settings WHERE name = 'debug_print_rewritten' and setting IN ('on') \gset
+SELECT count(*) > 0 obsrv_excessive_debug_print_plan FROM pg_settings WHERE name = 'debug_print_plan' and setting IN ('on') \gset
+select count(*) > 0 obsrv_synchronous_commit_parameter_disabled FROM pg_settings WHERE name = 'synchronous_commit' and setting = 'off' \gset
 
 \if :obsrv_autovacuum_parameter_disabled
      \qecho <br>
@@ -3516,9 +4284,30 @@ SELECT *  FROM pg_settings where name not in ('rds.extensions') order by categor
 SELECT *  FROM pg_settings where name in ('rds.extensions') order by category;
 \qecho </details>
 
+\qecho <br>
+\qecho <br>
+\qecho <h3>Parameters pending restart:</h3>
+\qecho <h4>Note: These parameters have been changed in the configuration file or via ALTER SYSTEM but require a database restart to take effect.</h4>
+\qecho <br>
+\qecho <details>
+SELECT name AS parameter_name,
+    setting AS current_value,
+    unit,
+    boot_val AS boot_value,
+    reset_val AS pending_value,
+    pending_restart,
+    source,
+    sourcefile
+FROM pg_settings
+WHERE pending_restart = true
+ORDER BY name;
+\qecho </details>
+
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_invalid_db
 -- +----------------------------------------------------------------------------+
 -- |      - Invalid_databases                                -                  |
 -- +----------------------------------------------------------------------------+
@@ -3542,21 +4331,224 @@ SELECT * FROM pg_database WHERE datconnlimit = '-2' ;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_idx_progress
 -- +----------------------------------------------------------------------------+
--- |      - *************                                    -                  |
+-- |      - Index_Creation_Progress                          -                  |
 -- +----------------------------------------------------------------------------+
 
 
-\qecho <a name="-----"></a>
-\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>*****</b></font><hr align="left" width="460">
+\qecho <a name="Index_Creation_Progress"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Index Creation Progress</b></font><hr align="left" width="460">
 \qecho <br>
 \qecho <details>
--- sql
+WITH parallel_workers AS (
+    SELECT
+        w.leader_pid,
+        count(*) AS worker_count,
+        array_agg(w.pid ORDER BY w.pid) AS worker_pids,
+        array_agg(coalesce(w.wait_event_type ||'.'|| w.wait_event, 'CPU') ORDER BY w.pid) AS worker_wait_events,
+        array_agg(w.state ORDER BY w.pid) AS worker_states
+    FROM pg_stat_activity w
+    WHERE w.backend_type = 'parallel worker'
+      AND w.leader_pid IS NOT NULL
+    GROUP BY w.leader_pid
+)
+SELECT 
+    p.datname                                                 AS database_name,
+    p.pid,
+    clock_timestamp() - a.xact_start                          AS duration_so_far,
+    a.application_name,
+    a.client_addr,
+    a.usename,
+    coalesce(a.wait_event_type ||'.'|| a.wait_event, 'CPU')  AS waiting,
+    p.command,
+    trim(trailing ';' from a.query)                           AS query,
+    a.state,
+    p.relid::regclass                                         AS table_name,
+    CASE 
+        WHEN EXISTS (SELECT 1 FROM pg_inherits WHERE inhparent = p.relid)
+        THEN pg_size_pretty((SELECT coalesce(sum(pg_relation_size(inhrelid)), 0) 
+                             FROM pg_inherits WHERE inhparent = p.relid))
+        ELSE pg_size_pretty(pg_relation_size(p.relid))
+    END AS table_size,
+    p.phase,
+    CASE p.phase
+        WHEN 'initializing' THEN '1 of 12'
+        WHEN 'waiting for writers before build' THEN '2 of 12'
+        WHEN 'building index: scanning table' THEN '3 of 12'
+        WHEN 'building index: sorting live tuples' THEN '4 of 12'
+        WHEN 'building index: loading tuples in tree' THEN '5 of 12'
+        WHEN 'waiting for writers before validation' THEN '6 of 12'
+        WHEN 'index validation: scanning index' THEN '7 of 12'
+        WHEN 'index validation: sorting tuples' THEN '8 of 12'
+        WHEN 'index validation: scanning table' THEN '9 of 12'
+        WHEN 'waiting for old snapshots' THEN '10 of 12'
+        WHEN 'waiting for readers before marking dead' THEN '11 of 12'
+        WHEN 'waiting for readers before dropping' THEN '12 of 12'
+    END AS phase_progress,
+    format('%s (%s of %s)',
+           coalesce(round(100.0 * p.blocks_done / nullif(p.blocks_total, 0), 2)::text || '%', 'not applicable'),
+           p.blocks_done::text,
+           p.blocks_total::text) AS scan_progress,
+    format('%s (%s of %s)',
+           coalesce(round(100.0 * p.tuples_done / nullif(p.tuples_total, 0), 2)::text || '%', 'not applicable'),
+           p.tuples_done::text,
+           p.tuples_total::text) AS tuples_loading_progress,
+    format('%s (%s of %s)',
+           coalesce((100 * p.lockers_done / nullif(p.lockers_total, 0))::text || '%', 'not applicable'),
+           p.lockers_done::text,
+           p.lockers_total::text) AS lockers_progress,
+    format('%s (%s of %s)',
+           coalesce((100 * p.partitions_done / nullif(p.partitions_total, 0))::text || '%', 'not applicable'),
+           p.partitions_done::text,
+           p.partitions_total::text) AS partitions_progress,
+    p.current_locker_pid,
+    trim(trailing ';' from l.query)                           AS current_locker_query,
+    coalesce(pw.worker_count, 0)                              AS parallel_workers_count,
+    pw.worker_pids                                            AS parallel_worker_pids,
+    pw.worker_wait_events                                     AS parallel_worker_wait_events,
+    pw.worker_states                                          AS parallel_worker_states
+FROM pg_stat_progress_create_index   AS p
+JOIN pg_stat_activity                AS a ON a.pid = p.pid
+LEFT JOIN pg_stat_activity           AS l ON l.pid = p.current_locker_pid
+LEFT JOIN parallel_workers           AS pw ON pw.leader_pid = p.pid
+ORDER BY clock_timestamp() - a.xact_start DESC;
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_mat_views
+-- +----------------------------------------------------------------------------+
+-- |      - Materialized_Views                               -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Materialized_Views"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Materialized Views</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+
+\qecho <h3>Materialized views count:</h3>
+SELECT count(*) AS materialized_views_count FROM pg_matviews;
+
+\qecho <br>
+\qecho <h3>Materialized views summary:</h3>
+SELECT 
+    schemaname,
+    matviewname,
+    matviewowner,
+    tablespace,
+    hasindexes,
+    ispopulated,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||matviewname)) AS total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||matviewname)) AS matview_size,
+    pg_size_pretty(pg_indexes_size(schemaname||'.'||matviewname)) AS indexes_size
+FROM pg_matviews
+ORDER BY pg_total_relation_size(schemaname||'.'||matviewname) DESC;
+
+\qecho <br>
+\qecho <h3>Materialized views definitions:</h3>
+SELECT 
+    schemaname,
+    matviewname,
+    definition
+FROM pg_matviews
+ORDER BY schemaname, matviewname;
+
+\qecho <br>
+\qecho <h3>Unpopulated materialized views (need REFRESH):</h3>
+SELECT 
+    schemaname,
+    matviewname,
+    matviewowner,
+    ispopulated
+FROM pg_matviews
+WHERE ispopulated = false
+ORDER BY schemaname, matviewname;
+
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+
+\if :do_foreign_servers
+-- +----------------------------------------------------------------------------+
+-- |      - Foreign_Servers                                  -                  |
+-- +----------------------------------------------------------------------------+
+
+
+\qecho <a name="Foreign_Servers"></a>
+\qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>Foreign Servers</b></font><hr align="left" width="460">
+\qecho <br>
+\qecho <details>
+\qecho <h3>Server Connection Details:</h3>
+\qecho <h4>Note: Lists each foreign server with its network connection settings</h4>
+\qecho <br>
+SELECT
+    fs.foreign_server_name AS server,
+    fs.foreign_data_wrapper_name AS wrapper,
+    MAX(CASE WHEN fso.option_name = 'host' THEN fso.option_value END) AS host,
+    MAX(CASE WHEN fso.option_name = 'port' THEN fso.option_value END) AS port,
+    MAX(CASE WHEN fso.option_name = 'dbname' THEN fso.option_value END) AS dbname
+FROM information_schema.foreign_servers fs
+LEFT JOIN information_schema.foreign_server_options fso
+    ON fs.foreign_server_name = fso.foreign_server_name
+GROUP BY fs.foreign_server_name, fs.foreign_data_wrapper_name
+ORDER BY fs.foreign_server_name;
+\qecho <br>
+\qecho <h3>Usage Summary:</h3>
+\qecho <h4>Note: Count of foreign tables mapped to each server</h4>
+\qecho <br>
+SELECT
+    foreign_server_name,
+    COUNT(*) AS total_foreign_tables
+FROM information_schema.foreign_tables
+GROUP BY foreign_server_name
+ORDER BY total_foreign_tables DESC;
+\qecho <br>
+\qecho <h3>Foreign Tables Inventory:</h3>
+\qecho <h4>Note: Shows every foreign table with its local and remote schema/table mapping</h4>
+\qecho <br>
+SELECT
+    fs.foreign_server_name AS server,
+    fs.foreign_data_wrapper_name AS wrapper,
+    ft.foreign_table_schema AS local_schema,
+    ft.foreign_table_name AS local_table,
+    MAX(CASE WHEN fto.option_name = 'schema_name' THEN fto.option_value END) AS remote_schema,
+    MAX(CASE WHEN fto.option_name = 'table_name' THEN fto.option_value END) AS remote_table
+FROM information_schema.foreign_servers fs
+JOIN information_schema.foreign_tables ft
+    ON fs.foreign_server_name = ft.foreign_server_name
+LEFT JOIN information_schema.foreign_table_options fto
+    ON ft.foreign_table_schema = fto.foreign_table_schema
+    AND ft.foreign_table_name = fto.foreign_table_name
+GROUP BY fs.foreign_server_name, fs.foreign_data_wrapper_name,
+         ft.foreign_table_schema, ft.foreign_table_name
+ORDER BY server, local_table;
+\qecho <br>
+\qecho <h3>Security Audit - User Mappings:</h3>
+\qecho <h4>Note: Shows which local users have credentials for remote servers. Passwords are masked.</h4>
+\qecho <br>
+SELECT
+    um.authorization_identifier AS local_user,
+    um.foreign_server_name AS server,
+    MAX(CASE WHEN umo.option_name = 'user' THEN umo.option_value END) AS remote_user,
+    MAX(CASE WHEN umo.option_name = 'password' THEN '********' END) AS password
+FROM information_schema.user_mappings um
+LEFT JOIN information_schema.user_mapping_options umo
+    ON um.authorization_identifier = umo.authorization_identifier
+    AND um.foreign_server_name = umo.foreign_server_name
+GROUP BY um.authorization_identifier, um.foreign_server_name
+ORDER BY server, local_user;
+\qecho </details>
+
+\qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+
+\if :do_aurora_version
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_version                                   -                  |
 -- +----------------------------------------------------------------------------+
@@ -3577,10 +4569,12 @@ SELECT * FROM aurora_version();
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
 
 
+\if :do_aurora_builtins
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_PostgreSQL_built-in_functions             -                  |
 -- +----------------------------------------------------------------------------+
@@ -3600,8 +4594,10 @@ SELECT * FROM aurora_list_builtins();
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_aurora_instance_id
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_db_instance_identifier             -                         |
 -- +----------------------------------------------------------------------------+
@@ -3628,7 +4624,9 @@ FROM aurora_replica_status() rt,
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_aurora_cluster
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_cluster_instances                  -                         |
 -- +----------------------------------------------------------------------------+
@@ -3653,7 +4651,9 @@ FROM aurora_replica_status() ;
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_aurora_replica_lag
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_reader_instances-Replica_Lag              -                  |
 -- +----------------------------------------------------------------------------+
@@ -3681,9 +4681,11 @@ ORDER BY replica_lag_in_msec NULLS FIRST;
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
 
+\if :do_aurora_ccm
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_cluster_cache_management_(CCM)            -                  |
 -- +----------------------------------------------------------------------------+
@@ -3706,9 +4708,11 @@ FROM aurora_ccm_status ();
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
 
+\if :do_aurora_global_db
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_global_db_status                          -                  |
 -- +----------------------------------------------------------------------------+
@@ -3733,7 +4737,9 @@ SELECT CASE
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_aurora_wait_events
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_wait_event_stat                        -                     |
 -- +----------------------------------------------------------------------------+
@@ -3765,8 +4771,10 @@ NATURAL JOIN aurora_stat_wait_type() order by wait_time desc;
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
+\if :do_aurora_qpm
 -- +----------------------------------------------------------------------------+
 -- |      - query_plan_management                            -                  |
 -- +----------------------------------------------------------------------------+
@@ -3784,14 +4792,159 @@ select count(*) = 0 is_apg_plan_mgmt_not_enabled FROM pg_catalog.pg_extension wh
     \else
        \if :is_apg_plan_mgmt_enabled
         show rds.enable_plan_management ;
+        \qecho <br>
+        \qecho <h3>apg_plan_mgmt installed extension info :</h3>
+        \qecho <br>
         SELECT e.extname AS "Extension Name", e.extversion AS "Version", n.nspname AS "Schema",pg_get_userbyid(e.extowner)  as Owner, c.description AS "Description" , e.extrelocatable as "relocatable to another schema", e.extconfig ,e.extcondition
         FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace LEFT JOIN pg_catalog.pg_description c ON c.objoid = e.oid AND c.classoid = 'pg_catalog.pg_extension'::pg_catalog.regclass
         where e.extname = 'apg_plan_mgmt';
+        \qecho <br>
         select * from pg_available_extensions where name='apg_plan_mgmt';
+        \qecho <br>
+        \qecho <h3>apg_plan_mgmt available extension version :</h3> 
+        \qecho <br>
         SELECT name ,version ,installed FROM pg_available_extension_versions where  name='apg_plan_mgmt' order by version;
+        \qecho <br>
+        \qecho <h3>Query Plan Management parameters  :</h3>
+        \qecho <br>
         select name,setting from pg_settings  where name like 'apg_plan_mgmt%';
-        with plans_stored_count as (select count(*) as cnt from apg_plan_mgmt.dba_plans)
+        \qecho <br>
+        \qecho <h3>apg_plan_mgmt.max_plans utilization :</h3> 
+        \qecho <br>
+        with plans_stored_count as (select count(*) as cnt from apg_plan_mgmt.dba_plans) 
         select s.setting as max_plans, p.cnt as plans_stored_count, (p.cnt/s.setting::int)*100 as plans_stored_PCT_from_max_plans from pg_settings s, plans_stored_count p where s.name ='apg_plan_mgmt.max_plans';
+        \qecho <br>
+        \qecho <h3>apg_plan_mgmt.plans table size :</h3> 
+        \qecho <br>
+        SELECT pg_size_pretty(pg_total_relation_size('apg_plan_mgmt.plans')) as "apg_plan_mgmt.plans total table size (table+indexes)";
+        \qecho <br>
+        SELECT pg_size_pretty(pg_relation_size('apg_plan_mgmt.plans')) as "apg_plan_mgmt.plans table size";
+        \qecho <br>
+        \qecho <h3>sqls (sql_hash) that have multiple plans  :</h3>
+        \qecho <br>
+        SELECT sql_hash,plan_hash,status,enabled,origin,estimated_total_cost,plan_created,queryid ,sql_text,stmt_name,                 param_types,               param_list,               plan_outline,                               environment_variables,last_verified,             last_validated,           last_used,                 created_by,               compatibility_level,       has_side_effects,         planning_time_ms,         execution_time_ms,         cardinality_error,         estimated_startup_cost,    estimated_total_cost,      total_time_benefit_ms,     execution_time_benefit_ms
+        FROM apg_plan_mgmt.dba_plans
+        WHERE sql_hash IN (SELECT sql_hash
+        FROM apg_plan_mgmt.dba_plans
+        GROUP BY sql_hash
+        HAVING COUNT(DISTINCT plan_hash) > 1)
+        ORDER BY sql_hash, estimated_total_cost;
+        \qecho <br>
+        \qecho <h3>sqls (sql_hash) that have multiple plans where an Unapproved plan has lower cost than other plans :</h3>
+        \qecho <br>
+        WITH plan_costs AS (SELECT
+        sql_hash,
+        plan_hash,
+        status,
+        estimated_total_cost,
+        MIN(CASE WHEN status != 'Unapproved' THEN estimated_total_cost END)
+        OVER (PARTITION BY sql_hash) AS min_non_unapproved_cost
+        FROM
+        apg_plan_mgmt.dba_plans
+        WHERE
+        sql_hash IN (SELECT sql_hash
+        FROM apg_plan_mgmt.dba_plans
+        GROUP BY sql_hash
+        HAVING COUNT(DISTINCT plan_hash) > 1)),
+        filtered_plans AS (SELECT DISTINCT
+        sql_hash,
+        MAX(CASE WHEN status = 'Unapproved' THEN estimated_total_cost END)
+        OVER (PARTITION BY sql_hash) AS unapproved_cost,
+        MAX(min_non_unapproved_cost) OVER (PARTITION BY sql_hash) AS other_plan_cost
+        FROM
+        plan_costs
+        WHERE
+        status = 'Unapproved'
+        AND estimated_total_cost < min_non_unapproved_cost)
+        SELECT
+        fp.sql_hash,
+        COUNT(DISTINCT pc.plan_hash) AS total_plans,
+        fp.unapproved_cost,
+        fp.other_plan_cost,
+        fp.other_plan_cost - fp.unapproved_cost AS cost_savings
+        FROM
+        filtered_plans fp
+        JOIN
+        plan_costs pc ON fp.sql_hash = pc.sql_hash
+        GROUP BY
+        fp.sql_hash, fp.unapproved_cost, fp.other_plan_cost
+        ORDER BY
+        cost_savings DESC;
+        \qecho <br>
+        WITH eligible_sql_hashes AS (SELECT DISTINCT p1.sql_hash
+        FROM apg_plan_mgmt.dba_plans p1
+        JOIN apg_plan_mgmt.dba_plans p2
+        ON p1.sql_hash = p2.sql_hash
+        AND p1.plan_hash != p2.plan_hash
+        WHERE
+        p1.status = 'Unapproved'
+        AND p2.status != 'Unapproved'
+        AND p1.estimated_total_cost < p2.estimated_total_cost)
+        SELECT
+        dp.sql_hash,
+        dp.plan_hash,
+        dp.status,
+        dp.enabled,
+        dp.origin,
+        dp.estimated_total_cost,
+        dp.plan_created,
+        dp.queryid ,
+        dp.sql_text,
+        dp.stmt_name,                 
+        dp.param_types,               
+        dp.param_list,               
+        dp.plan_outline,                               
+        dp.environment_variables,
+        dp.last_verified,             
+        dp.last_validated,           
+        dp.last_used,                 
+        dp.created_by,               
+        dp.compatibility_level,       
+        dp.has_side_effects,         
+        dp.planning_time_ms,         
+        dp.execution_time_ms,         
+        dp.cardinality_error,         
+        dp.estimated_startup_cost,    
+        dp.total_time_benefit_ms,     
+        dp.execution_time_benefit_ms
+        FROM
+        apg_plan_mgmt.dba_plans dp
+        WHERE
+        dp.sql_hash IN (SELECT sql_hash FROM eligible_sql_hashes)
+        ORDER BY
+        dp.sql_hash,
+        dp.estimated_total_cost ASC,
+        dp.status DESC;
+        \qecho <br>
+        \qecho <h3>Plan summary by status :</h3>
+        \qecho <br>
+        SELECT status, enabled, COUNT(*) AS plan_count FROM apg_plan_mgmt.dba_plans GROUP BY status, enabled ORDER BY status, enabled;
+        \qecho <br>
+        \qecho <h3>All Query Plans :</h3>
+        \qecho <br>
+        -- Check table size against 5 MB threshold
+        SELECT 
+          COUNT(*) as plan_count,
+          pg_total_relation_size('apg_plan_mgmt.plans') as table_size_bytes,
+          pg_size_pretty(pg_total_relation_size('apg_plan_mgmt.plans')) as table_size_pretty,
+          pg_total_relation_size('apg_plan_mgmt.plans') > (5 * 1024 * 1024) as exceeds_size_limit
+        FROM apg_plan_mgmt.dba_plans \gset
+        \if :exceeds_size_limit
+          \qecho <div style="border:1px solid orange; padding:10px; background-color:#fff3cd;">
+          \qecho <p><b>⚠️ All Plans Section: Display Limited</b></p>
+          \qecho <p><b>Reason:</b> The apg_plan_mgmt.plans table size (:table_size_pretty) exceeds the 5 MB threshold.</p>
+          \qecho <p>Displaying all :plan_count plans would significantly increase the report size.</p>
+          \qecho <p><b>Alternatives:</b></p>
+          \qecho <ul>
+          \qecho <li>Use the diagnostic sections above to view specific plans (multiple plans, unapproved plans, etc.)</li>
+          \qecho <li>Query specific plans: <code>SELECT * FROM apg_plan_mgmt.dba_plans WHERE sql_hash = 'your_hash';</code></li>
+          \qecho <li>Export to file: <code>COPY (SELECT * FROM apg_plan_mgmt.dba_plans) TO '/tmp/qpm_all_plans.csv' CSV HEADER</code></li>
+          \qecho </ul>
+          \qecho </div>
+        \else
+          \qecho <p><i>Displaying all :plan_count plans (table size: :table_size_pretty)</i></p>
+          SELECT * FROM apg_plan_mgmt.dba_plans ORDER BY sql_hash, plan_hash, status;
+        \endif
        \endif
     \endif  
 \else
@@ -3801,7 +4954,9 @@ select count(*) = 0 is_apg_plan_mgmt_not_enabled FROM pg_catalog.pg_extension wh
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
+\if :do_aurora_dml
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_dml_activity                              -                  |
 -- +----------------------------------------------------------------------------+
@@ -3847,6 +5002,8 @@ select datname as database_name ,
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+\if :do_aurora_memctx
 -- +----------------------------------------------------------------------------+
 -- |      - process_memory_context_usage                              -         |
 -- +----------------------------------------------------------------------------+
@@ -3919,9 +5076,11 @@ order by PID, allocated_size_bytes desc;
 \endif
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
 
 
 
+\if :do_aurora_wal_cache
 -- +----------------------------------------------------------------------------+
 -- |      - logical_replication_write_through_cache          -                  |
 -- +----------------------------------------------------------------------------+
@@ -3949,10 +5108,12 @@ SELECT * FROM aurora_stat_logical_wal_cache();
 \qecho </details>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
+\endif
+\endif
 
 \pset format aligned
 \r
 \o
 \echo Report Generated Successfully
-\echo Report name and location: /tmp/pg_collector_:filename.html
+\echo Report name and location: :outdir/pg_collector_:filename.html
 \q
