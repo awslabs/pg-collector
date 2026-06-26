@@ -3,8 +3,8 @@
 -- |  -- Author : Mohamed Ali                                                                                    |
 -- |  -- Create Date : 16 SEPT 2019                                                                              |
 -- |  -- Description : Script to collect PostgreSQL Database Information and generate HTML Report                |
--- |  -- version : V1.1 for PostgreSQL 18                                                                        |
--- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-18/CHANGELOG.md    | 
+-- |  -- version : V1 for PostgreSQL 19                                                                          |
+-- |  -- Changelog : https://github.com/awslabs/pg-collector/blob/pg-collector-for-postgresql-19/CHANGELOG.md    | 
 -- | Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.                                          |
 -- | SPDX-License-Identifier: MIT-0                                                                              |
 -- +-------------------------------------------------------------------------------------------------------------+
@@ -286,21 +286,6 @@ SELECT CASE WHEN :'aurora_stat_stmt' = ':aurora_stat_stmt' THEN 'f' ELSE :'auror
 SELECT CASE WHEN :'aurora_stat_plans' = ':aurora_stat_plans' THEN 'f' ELSE :'aurora_stat_plans' END AS "aurora_stat_plans" \gset
 \set aurora_wal_cache :aurora_wal_cache
 SELECT CASE WHEN :'aurora_wal_cache' = ':aurora_wal_cache' THEN 'f' ELSE :'aurora_wal_cache' END AS "aurora_wal_cache" \gset
--- Compute do_ flags for Aurora sub-sections
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_version' = 't' THEN 't' ELSE 'f' END AS "do_aurora_version" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_builtins' = 't' THEN 't' ELSE 'f' END AS "do_aurora_builtins" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_instance_id' = 't' THEN 't' ELSE 'f' END AS "do_aurora_instance_id" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_cluster' = 't' THEN 't' ELSE 'f' END AS "do_aurora_cluster" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_replica_lag' = 't' THEN 't' ELSE 'f' END AS "do_aurora_replica_lag" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_ccm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_ccm" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_global_db' = 't' THEN 't' ELSE 'f' END AS "do_aurora_global_db" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wait_events' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wait_events" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_qpm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_qpm" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_dml' = 't' THEN 't' ELSE 'f' END AS "do_aurora_dml" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_memctx' = 't' THEN 't' ELSE 'f' END AS "do_aurora_memctx" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_stat_stmt' = 't' THEN 't' ELSE 'f' END AS "do_aurora_stat_stmt" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_stat_plans' = 't' THEN 't' ELSE 'f' END AS "do_aurora_stat_plans" \gset
-SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wal_cache' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wal_cache" \gset
 -- Resolve Limitless sub-section variables
 \set limitless_routers :limitless_routers
 SELECT CASE WHEN :'limitless_routers' = ':limitless_routers' THEN 'f' ELSE :'limitless_routers' END AS "limitless_routers" \gset
@@ -326,6 +311,21 @@ SELECT CASE WHEN :'limitless_sessions' = ':limitless_sessions' THEN 'f' ELSE :'l
 SELECT CASE WHEN :'limitless_dist_sess' = ':limitless_dist_sess' THEN 'f' ELSE :'limitless_dist_sess' END AS "limitless_dist_sess" \gset
 \set limitless_wait_events :limitless_wait_events
 SELECT CASE WHEN :'limitless_wait_events' = ':limitless_wait_events' THEN 'f' ELSE :'limitless_wait_events' END AS "limitless_wait_events" \gset
+-- Compute do_ flags for Aurora sub-sections
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_version' = 't' THEN 't' ELSE 'f' END AS "do_aurora_version" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_builtins' = 't' THEN 't' ELSE 'f' END AS "do_aurora_builtins" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_instance_id' = 't' THEN 't' ELSE 'f' END AS "do_aurora_instance_id" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_cluster' = 't' THEN 't' ELSE 'f' END AS "do_aurora_cluster" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_replica_lag' = 't' THEN 't' ELSE 'f' END AS "do_aurora_replica_lag" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_ccm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_ccm" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_global_db' = 't' THEN 't' ELSE 'f' END AS "do_aurora_global_db" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wait_events' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wait_events" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_qpm' = 't' THEN 't' ELSE 'f' END AS "do_aurora_qpm" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_dml' = 't' THEN 't' ELSE 'f' END AS "do_aurora_dml" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_memctx' = 't' THEN 't' ELSE 'f' END AS "do_aurora_memctx" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_stat_stmt' = 't' THEN 't' ELSE 'f' END AS "do_aurora_stat_stmt" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_stat_plans' = 't' THEN 't' ELSE 'f' END AS "do_aurora_stat_plans" \gset
+SELECT CASE WHEN :'fullmod' = 't' OR :'aurora_wal_cache' = 't' THEN 't' ELSE 'f' END AS "do_aurora_wal_cache" \gset
 -- Compute do_ flags for Limitless sub-sections
 SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_routers' = 't' THEN 't' ELSE 'f' END AS "do_limitless_routers" \gset
 SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_params' = 't' THEN 't' ELSE 'f' END AS "do_limitless_params" \gset
@@ -339,9 +339,11 @@ SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_sso' = 't' THEN 't' ELSE 'f' EN
 SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_sessions' = 't' THEN 't' ELSE 'f' END AS "do_limitless_sessions" \gset
 SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_dist_sess' = 't' THEN 't' ELSE 'f' END AS "do_limitless_dist_sess" \gset
 SELECT CASE WHEN :'fullmod' = 't' OR :'limitless_wait_events' = 't' THEN 't' ELSE 'f' END AS "do_limitless_wait_events" \gset
+
 -- Resolve output directory: use -v outdir=/path to override, default is /tmp
 \set outdir :outdir
 SELECT CASE WHEN :'outdir' = ':outdir' THEN '/tmp' ELSE :'outdir' END AS "outdir" \gset
+
 \pset format html
 \set filename :DBNAME-`date +%Y-%m-%d_%H%M%S`
 \o :outdir/pg_collector_:filename.html
@@ -394,8 +396,8 @@ SELECT CASE WHEN :'outdir' = ':outdir' THEN '/tmp' ELSE :'outdir' END AS "outdir
 \qecho font:bold 10pt Arial,Helvetica,sans-serif; 
 \qecho color:green; } 
 \qecho </style> 
-\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1.1 for PostgreSQL 18</h1>
-\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-18" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
+\qecho <h1 align="center" style="background-color:#e59003" >PG COLLECTOR  V1 for PostgreSQL 19</h1>
+\qecho <font size="+1" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><a href="https://github.com/awslabs/pg-collector/tree/pg-collector-for-postgresql-19" target="_blank">For more information about PG Collector, visit the project github repository</a></font><hr align="left" >
 \qecho <font size="+2" face="Arial,Helvetica,Geneva,sans-serif" color="#16191f"><b>DB INFO</b></font><hr align="left" width="150">
 \qecho <br>
 \qecho 'PG Host Name / PG RDS ENDPOINT: ':HOST
@@ -715,11 +717,11 @@ select case when pg_is_in_recovery() then 'Standby/Reader DB (Read Only)' else '
 \endif
 \if :do_limitless_sso
 \echo '  - Single Shard Optimized (SSO)'
-\qecho <li><a href="#Single_Shard_Optimized">Single Shard Optimized (SSO)</a></li>
+\qecho <li><a href="#Single_Shard_Optimized_(SSO)">Single Shard Optimized (SSO)</a></li>
 \endif
 \if :do_limitless_sessions
 \echo '  - Limitless Sessions/Connections'
-\qecho <li><a href="#Limitless_Sessions">Limitless Sessions/Connections</a></li>
+\qecho <li><a href="#limitless_sessions_info">Limitless Sessions/Connections</a></li>
 \endif
 \if :do_limitless_dist_sess
 \echo '  - Distributed sessions info'
@@ -727,7 +729,7 @@ select case when pg_is_in_recovery() then 'Standby/Reader DB (Read Only)' else '
 \endif
 \if :do_limitless_wait_events
 \echo '  - Limitless Database Load (Wait events)'
-\qecho <li><a href="#Limitless_wait_events">Limitless Database Load (Wait events)</a></li>
+\qecho <li><a href="#Limitless_Database_Load_Wait_events">Limitless Database Load (Wait events)</a></li>
 \endif
 \qecho </ul>
 \endif
@@ -765,6 +767,7 @@ ORDER BY 1;
 select * from pg_database; 
 \qecho <br>
 \qecho <br>
+\if :fullmod
 \qecho <table width="90%" border="1"> 
 \qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>INFO</b></font></div></th></tr> 
 \qecho <tr> 
@@ -840,11 +843,13 @@ select * from pg_database;
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#******">******</a></td>
 \qecho </tr>
 \qecho </table>
+\endif
 \qecho <br>
 \qecho <br>
 \qecho <br>
 select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and setting like '%aurora_stat_utils%' \gset
 \if :isaurora
+\if :fullmod
 \qecho <table width="90%" border="1">
 \qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>Amazon Aurora PostgreSQL</b></font></div></th></tr>
 \qecho <tr>
@@ -873,8 +878,10 @@ select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and se
 \qecho </tr>
 \qecho </table>
 \endif
+\endif
 select count(*) > 0 isauroralimitless from pg_catalog.pg_extension where extname = 'aurora_limitless_fdw' \gset
 \if :isauroralimitless
+\if :fullmod
 \qecho <table width="90%" border="1">
 \qecho <tr><th colspan="4"><div align="center"><font color="#16191f"><b>Amazon Aurora Limitless Database</b></font></div></th></tr>
 \qecho <tr>
@@ -902,6 +909,7 @@ select count(*) > 0 isauroralimitless from pg_catalog.pg_extension where extname
 \qecho <td nowrap align="center" width="25%"><a class="link" href="#Limitless_Database_Load_Wait_events">Limitless Database Load (Wait events)</a></td>
 \qecho </tr>
 \qecho </table>
+\endif
 \endif
 \qecho <br>
 \qecho <br>
@@ -1358,7 +1366,6 @@ FROM pg_settings WHERE pending_restart = true \gset
 \qecho <br>
 \qecho <br>
 \endif
-
 \if :do_db_size
 -- +----------------------------------------------------------------------------+
 -- |      - Database_size                                    -                  |
@@ -1886,6 +1893,7 @@ LIMIT 50;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_index_size
 -- +----------------------------------------------------------------------------+
 -- |      - index_Size                                    -                  |
@@ -2114,6 +2122,7 @@ select relname as table_name , pg_namespace.nspname as schema_name ,reloptions f
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_extensions
 -- +----------------------------------------------------------------------------+
 -- |      - Extensions                                     -                  |
@@ -2338,6 +2347,8 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
 parallel_workers_to_launch,
 parallel_workers_launched,
+generic_plan_calls,
+custom_plan_calls,
 stats_since,
 minmax_stats_since
 from pg_stat_statements 
@@ -2362,6 +2373,8 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
 parallel_workers_to_launch,
 parallel_workers_launched,
+generic_plan_calls,
+custom_plan_calls,
 stats_since,
 minmax_stats_since
 from pg_stat_statements 
@@ -2386,6 +2399,8 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
 parallel_workers_to_launch,
 parallel_workers_launched,
+generic_plan_calls,
+custom_plan_calls,
 stats_since,
 minmax_stats_since
 from pg_stat_statements 
@@ -2410,6 +2425,8 @@ round(rows::numeric/calls,2) rows_per_exec,
 round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as percent,
 parallel_workers_to_launch,
 parallel_workers_launched,
+generic_plan_calls,
+custom_plan_calls,
 stats_since,
 minmax_stats_since
 from pg_stat_statements 
@@ -2435,6 +2452,8 @@ round((100 * total_exec_time / sum(total_exec_time) over ())::numeric, 4) as per
 shared_blks_read,
 parallel_workers_to_launch,
 parallel_workers_launched,
+generic_plan_calls,
+custom_plan_calls,
 stats_since,
 minmax_stats_since
 from pg_stat_statements 
@@ -2471,6 +2490,8 @@ SELECT
     pg_size_pretty((local_blks_read + local_blks_written) * 8 * 1024) AS total_local_blks_size,
     parallel_workers_to_launch,
     parallel_workers_launched,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2513,6 +2534,8 @@ SELECT
     pg_size_pretty((temp_blks_read + temp_blks_written) * 8 * 1024) AS total_temp_blks_size,
     parallel_workers_to_launch,
     parallel_workers_launched,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2539,6 +2562,8 @@ SELECT
     parallel_workers_to_launch,
     parallel_workers_launched,
     (parallel_workers_to_launch - parallel_workers_launched) AS workers_not_launched,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2564,6 +2589,8 @@ SELECT
     parallel_workers_to_launch,
     parallel_workers_launched,
     (parallel_workers_to_launch - parallel_workers_launched) AS workers_not_launched,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2589,6 +2616,8 @@ SELECT
     parallel_workers_to_launch,
     parallel_workers_launched,
     (parallel_workers_to_launch - parallel_workers_launched) AS workers_not_launched,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2617,6 +2646,8 @@ SELECT
     pg_size_pretty(wal_bytes::bigint) AS wal_bytes_pretty,
     round((wal_bytes / NULLIF(calls, 0))::numeric, 2) AS wal_bytes_per_call,
     wal_buffers_full,
+    generic_plan_calls,
+    custom_plan_calls,
     stats_since,
     minmax_stats_since
 FROM
@@ -2631,6 +2662,8 @@ LIMIT 20;
         \qecho 'pg_stat_statements extension is not installed'
     \endif
 \endif
+
+
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
@@ -3077,6 +3110,7 @@ order by index_size desc;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_index_access
 -- +----------------------------------------------------------------------------+
 -- |      - Index_Access_Profile                                    -                  |
@@ -3520,6 +3554,7 @@ WHERE name in ('wal_level','max_wal_senders','max_replication_slots',
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_sessions
 -- +----------------------------------------------------------------------------+
 -- |      - sessions_info                                                     - |
@@ -3624,6 +3659,7 @@ order by xact_duration desc, query_duration desc;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_prepared_txn
 -- +----------------------------------------------------------------------------+
 -- |      - Orphaned_prepared_transactions                   -                  |
@@ -3645,6 +3681,7 @@ ORDER BY age(transaction) DESC;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_pk_fk
 -- +----------------------------------------------------------------------------+
@@ -3976,6 +4013,7 @@ order by ssl ;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_bg_processes
 -- +----------------------------------------------------------------------------+
 -- |      - background_processes                                   -            |
@@ -4025,6 +4063,7 @@ order by 2 desc limit 20;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_temp
 -- +----------------------------------------------------------------------------+
@@ -4285,6 +4324,7 @@ ORDER BY 1,2;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_partitions
 -- +----------------------------------------------------------------------------+
 -- |      - Partition_tables                                    -               |
@@ -4369,6 +4409,7 @@ ORDER BY parent.relnamespace, parent.relname, pg_total_relation_size(child.oid) 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_pg_shdepend
 -- +----------------------------------------------------------------------------+
 -- |      - pg_shdepend                                    -                    |
@@ -4434,6 +4475,7 @@ ORDER BY pg_catalog.pg_relation_size(c.conrelid) DESC;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_sequences
 -- +----------------------------------------------------------------------------+
@@ -4548,6 +4590,8 @@ select * from pg_hba_file_rules;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
+
 \if :do_dup_idx
 -- +----------------------------------------------------------------------------+
 -- |      - Duplicate_indexes                                   -               |
@@ -4616,6 +4660,7 @@ ORDER BY
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_functions
 -- +----------------------------------------------------------------------------+
 -- |      - functions_statistics                             -                  |
@@ -4642,6 +4687,7 @@ order by total_time desc;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_db_load
 -- +----------------------------------------------------------------------------+
@@ -4836,6 +4882,7 @@ select count(*) > 0 isaurora from pg_settings where name='rds.extensions' and se
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_db_params
 -- +----------------------------------------------------------------------------+
 -- |      - DB_parameters                                    -                  |
@@ -5024,6 +5071,8 @@ SELECT * FROM pg_stat_progress_copy ;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
+
 \if :do_idx_progress
 -- +----------------------------------------------------------------------------+
 -- |      - Index_Creation_Progress                          -                  |
@@ -5110,6 +5159,8 @@ ORDER BY clock_timestamp() - a.xact_start DESC;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
+
 
 \if :do_invalid_db
 -- +----------------------------------------------------------------------------+
@@ -5283,6 +5334,9 @@ SELECT * FROM aurora_version();
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
+
+
 \if :do_aurora_builtins
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_PostgreSQL_built-in_functions             -                  |
@@ -5297,6 +5351,7 @@ SELECT * FROM aurora_list_builtins();
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_aurora_instance_id
 -- +----------------------------------------------------------------------------+
@@ -5363,6 +5418,8 @@ ORDER BY replica_lag_in_msec NULLS FIRST;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
+
 \if :do_aurora_ccm
 -- +----------------------------------------------------------------------------+
 -- |      - Aurora_cluster_cache_management_(CCM)            -                  |
@@ -5380,6 +5437,8 @@ FROM aurora_ccm_status ();
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
+
 
 \if :do_aurora_global_db
 -- +----------------------------------------------------------------------------+
@@ -5431,6 +5490,7 @@ NATURAL JOIN aurora_stat_wait_type() order by wait_time desc;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_aurora_qpm
 -- +----------------------------------------------------------------------------+
@@ -5648,7 +5708,6 @@ select datname as database_name ,
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
-
 \if :do_aurora_memctx
 -- +----------------------------------------------------------------------------+
 -- |      - process_memory_context_usage                              -         |
@@ -5709,7 +5768,6 @@ order by PID, allocated_size_bytes desc;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
-
 \if :do_aurora_stat_stmt
 -- +----------------------------------------------------------------------------+
 -- |      - aurora_stat_statements                           -                  |
@@ -5806,6 +5864,7 @@ order by storage_blks_read desc limit 50;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_aurora_stat_plans
 -- +----------------------------------------------------------------------------+
@@ -5971,6 +6030,7 @@ SELECT * FROM aurora_stat_logical_wal_cache();
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+\endif
 --------------------------------------------
 ----- Amazon Aurora Limitless Database -----
 \if :isauroralimitless
@@ -6013,6 +6073,7 @@ select * from  rds_aurora.limitless_stat_subclusters;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_limitless_params
 -- +----------------------------------------------------------------------------+
@@ -6100,6 +6161,9 @@ order by database_name;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
+
+
 \if :do_limitless_extensions
 -- +----------------------------------------------------------------------------+
 -- |      - Limitless_Extensions                      -                         |
@@ -6133,6 +6197,7 @@ select * from pg_available_extensions order by installed_version;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_limitless_txid
 -- +----------------------------------------------------------------------------+
@@ -6235,6 +6300,7 @@ SELECT * FROM pg_catalog.pg_indexes WHERE tablename in (SELECT table_name from r
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_limitless_stat_stmt
 -- +----------------------------------------------------------------------------+
@@ -6347,6 +6413,7 @@ order by storage_blks_read desc limit 50;
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
 
+
 \if :do_limitless_msq
 -- +----------------------------------------------------------------------------+
 -- |      - Multi_shard_queries_(MSQ)                 -                         |
@@ -6454,6 +6521,7 @@ order by storage_blks_read desc limit 50;
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
+
 
 \if :do_limitless_sso
 -- +----------------------------------------------------------------------------+
@@ -6571,7 +6639,6 @@ order by storage_blks_read desc limit 50;
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
 \endif
-
 \if :do_limitless_sessions
 -- +----------------------------------------------------------------------------+
 -- |      - limitless_sessions_info                                           - |
@@ -7094,7 +7161,6 @@ count(*)
 \qecho <br>
 
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
-\endif
 \endif
 \endif
 --------------------------------------------

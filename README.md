@@ -112,7 +112,6 @@ psql -h [hostname] -p [port] -d [dbname] -U [user] -v outdir=/home/user/reports 
 > If the directory does not exist, psql cannot open the output file and the HTML report will be printed to the terminal screen instead of saved to a file.
 
 
-
 ## How to run PG Collector script ( pg_collector.sql )
 
 1- you need [psql](https://www.postgresql.org/docs/current/app-psql.html) to be able to connect to the postgresql DB and run the pg_collector.sql script 
@@ -148,6 +147,8 @@ SSL connection (protocol: TLSv1.2, cipher: ECDHE-RSA-AES256-GCM-SHA384, bits: 25
 Type "help" for help.
 
 testdb=> \i pg_collector.sql
+SET
+statement_timeout set to 5 minutes. To change, edit the SET statement_timeout line in the script.
 Output format is html.
 Output format is aligned.
 Query buffer reset (cleared).
@@ -179,8 +180,8 @@ Output:
 ```
 PG Collector - Available Sections:
 
-  Variable Name        Description
-  ---------------      ----------------------------------------
+  Variable Name     Description
+  -------------     -----------
   observations    - Observations (Health checks)
   db_size         - Database size
   txid            - Transaction ID TXID (Wraparound)
@@ -309,6 +310,8 @@ The HTML report header will show a "Partial Report" banner listing the included 
 
 > **Note:** Only the value `t` enables a section. Any other value (`f`, `0`, or not set) skips the section.
 
+
+
 ## PG Collector & AI
 
 PG Collector HTML reports are designed for humans — beautiful tables, clickable navigation, everything formatted nicely. But when feeding reports into an AI model, all that HTML markup translates to a lot of unnecessary tokens.
@@ -326,6 +329,20 @@ Example:
 ```bash
 pandoc pg_collector_postgres-2026-02-13_053714.html -f html -t markdown -o pg_collector_postgres-2026-02-13_053714.md
 ```
+
+### Combine with Selective Section Execution
+
+For even greater efficiency, generate a focused report covering only the sections relevant to your question before converting:
+
+```bash
+# Generate a focused vacuum + bloat report
+psql -v fullmod=f -v vacuum=t -v bloat=t -f pg_collector.sql
+
+# Convert to Markdown for AI analysis
+pandoc /tmp/pg_collector_mydb-2026-02-13_053714.html -f html -t markdown -o report.md
+```
+
+This gives the AI model only the data it needs — no noise, fewer tokens, sharper answers.
 
 ## Notes:
 1- it is ok to see below errors while executing the pg_collector.sql script if you did not install pg_stat_statements extension
