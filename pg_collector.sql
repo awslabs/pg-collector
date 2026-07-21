@@ -5868,7 +5868,7 @@ select * from  rds_aurora.limitless_stat_subclusters;
 \qecho <br>
 select *  from pg_settings where name like '%limitless%'  order by name;
 \qecho <br>
-SELECT *  FROM pg_settings where name in ('max_worker_processes','max_prepared_transactions','enable_partitionwise_aggregate','venable_partitionwise_join','default_transaction_isolation') order by category;
+SELECT *  FROM pg_settings where name in ('max_worker_processes','max_prepared_transactions','enable_partitionwise_aggregate','enable_partitionwise_join','default_transaction_isolation') order by category;
 
 \qecho </details>
 \qecho <center>[<a class="noLink" href="#top">Top</a>]</center><p>
